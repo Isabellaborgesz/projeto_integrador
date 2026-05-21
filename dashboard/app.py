@@ -2,8 +2,12 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import pandas as pd
 import plotly.express as px
+import os
 
-# 1. Suas configurações de usuário (Mantenha como está)
+# 1. CONFIGURAÇÃO DA PÁGINA (Precisa obrigatoriamente ser o primeiro comando Streamlit do código)
+st.set_page_config(page_title="Motor de Oportunidades B2B", layout="wide")
+
+# 2. CONFIGURAÇÕES DE USUÁRIO
 config = {                                      
      "credentials": {                                     
          "usernames": {
@@ -28,10 +32,10 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-# 2. Renderiza a tela de login
+# 3. RENDERIZA A TELA DE LOGIN
 authenticator.login(fields=['username', 'password'])
 
-# 3. Validações de segurança
+# 4. VALIDAÇÕES DE SEGURANÇA
 if st.session_state["authentication_status"] == False:
     st.error('Usuário ou senha incorretos.')
 
@@ -39,63 +43,66 @@ elif st.session_state["authentication_status"] == None:
     st.warning('Por favor, insira seu usuário e senha.')
 
 elif st.session_state["authentication_status"]:
-    # ⚠️ TUDO DAQUI PARA BAIXO PRECISA DE 4 ESPAÇOS (OU 1 TAB) NO COMEÇO DA LINHA
+    # ⚠️ SE O LOGIN FOR BEM-SUCEDIDO, EXECUTA TUDO DAQUI PARA BAIXO (COM RECUO/TAB)
     
     authenticator.logout('Sair do Sistema', 'sidebar')
     nome_usuario = st.session_state["name"]
-    st.title(f"Bem-vindo ao Dashboard, {nome_usuario}!")
     
-    # ⬇️ Cole o seu código antigo aqui dentro (repare no espaço no começo de cada linha):
-    df_clientes = pd.read_csv("../Clientes CTI.xlsx - Clientes CTI.csv")
-    df_tickets = pd.read_csv("../Result_28.xlsx - Result 1.csv")
-    
-    st.subheader("Análise de Chamados e Clientes")
-    
-    # Exemplo de gráfico (coloque os seus gráficos reais aqui com o recuo):
-    fig = px.histogram(df_tickets, x="status_cliente", title="Status dos Chamados")
-    st.plotly_chart(fig)
-    
-    # Se você tiver mais tabelas ou funções, todas ficam com o recuo aqui dentro!
-    # --- O RESTANTE DO SEU CÓDIGO (Gráficos, pandas, etc.) CONTINUA AQUI ---
-    
-   #_______________________________________________________________#
-
-
-    import streamlit as st
-    import pandas as pd
-    import plotly.express as px
-    import os
-
-    # Configuração da Página
-    st.set_page_config(page_title="Motor de Oportunidades B2B", layout="wide")
-
+    # Título do Dashboard principal
     st.title("🎯 Dashboard de Oportunidades de Vendas B2B")
-    st.markdown("Identificação automática de Cross-Sell e Up-Sell baseada em chamados de suporte técnico.")
+    st.markdown(f"Bem-vindo, {nome_usuario}! Identificação automática de Cross-Sell e Up-Sell baseada em chamados de suporte técnico.")
 
-    # Carregar dados
+    # 5. FUNÇÃO PARA CARREGAR OS DADOS (LENDO EXCEL .XLSX)
     @st.cache_data
     def load_data():
-        # Descobre automaticamente a pasta raiz do projeto e aponta para a pasta output
+        # Descobre automaticamente a pasta raiz do projeto de forma dinâmica
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        caminho_csv = os.path.join(BASE_DIR, "output", "oportunidades.csv")
+        
+        # AJUSTE AQUI: Monta o caminho exato apontando para os seus arquivos .xlsx originais na raiz
+        caminho_clientes = os.path.join(BASE_DIR, "Clientes CTI.xlsx")
+        caminho_tickets = os.path.join(BASE_DIR, "Result_28.xlsx")
+        
+        # Se você gerou um arquivo consolidado na pasta output em formato Excel, aponte assim:
+        caminho_oportunidades = os.path.join(BASE_DIR, "output", "oportunidades.xlsx")
         
         try:
-            return pd.read_csv(caminho_csv)
-        except FileNotFoundError:
+            # Se o seu pipeline gera o arquivo final na pasta output, usamos ele:
+            if os.path.exists(caminho_oportunidades):
+                return pd.read_excel(caminho_oportunidades)
+            
+            # Caso contrário, se o seu app lê direto a planilha original de resultados:
+            elif os.path.exists(caminho_tickets):
+                return pd.read_excel(caminho_tickets)
+                
+            return None
+        except Exception as e:
+            st.error(f"Erro ao ler as planilhas: {e}")
             return None
 
     df = load_data()
 
     if df is None or df.empty:
-        st.warning("Nenhum dado encontrado. Verifique se o arquivo 'oportunidades.csv' existe na pasta 'output'. Se não, execute o pipeline.py primeiro.")
+        st.warning("Nenhum dado encontrado. Verifique se os arquivos '.xlsx' existem na pasta raiz ou na pasta 'output'.")
     else:
         # --- KPIs Superiores ---
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total de Oportunidades", len(df))
-        col2.metric("Alta Prioridade (Hot Leads)", len(df[df['prioridade_comercial'] == 'ALTA']))
-        col3.metric("Tickets Analisados (Oportunidades)", df['qtd_tickets'].sum())
-        top_servico = df['servico_sugerido'].mode()[0] if not df.empty else "N/A"
-        col4.metric("Top Serviço Recomendado", top_servico)
+        col1.metric("Total de Registros Analisados", len(df))
+        
+        # Condicionais de segurança caso as colunas de prioridade comercial/tickets existam na sua planilha final
+        if 'prioridade_comercial' in df.columns:
+            col2.metric("Alta Prioridade (Hot Leads)", len(df[df['prioridade_comercial'] == 'ALTA']))
+            top_servico = df['servico_sugerido'].mode()[0] if 'servico_sugerido' in df.columns and not df.empty else "N/A"
+            col4.metric("Top Serviço Recomendado", top_servico)
+        else:
+            col2.metric("Alta Prioridade", "N/A")
+            col4.metric("Top Serviço Recomendado", "N/A")
+            
+        if 'qtd_tickets' in df.columns:
+            col3.metric("Tickets Analisados", df['qtd_tickets'].sum())
+        elif 'id_ticket' in df.columns:
+            col3.metric("Total de Tickets", df['id_ticket'].nunique())
+        else:
+            col3.metric("Tickets Analisados", "N/A")
 
         st.divider()
 
@@ -103,28 +110,33 @@ elif st.session_state["authentication_status"]:
         c1, c2 = st.columns(2)
 
         with c1:
-            st.subheader("Oportunidades por Categoria de Problema")
-            fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), 
-                            x='categoria_problema', y='count', color='categoria_problema')
+            st.subheader("Análise por Status ou Categoria")
+            # Tenta plotar pela coluna 'categoria' ou 'status_cliente' dependendo do seu arquivo original
+            coluna_grafico_1 = 'categoria' if 'categoria' in df.columns else ('status_cliente' if 'status_cliente' in df.columns else df.columns[0])
+            fig_cat = px.bar(df[coluna_grafico_1].value_counts().reset_index(), 
+                            x=coluna_grafico_1, y='count', color=coluna_grafico_1)
             st.plotly_chart(fig_cat, use_container_width=True)
 
         with c2:
-            st.subheader("Distribuição de Prioridade Comercial")
-            fig_prio = px.pie(df, names='prioridade_comercial', hole=0.4, 
-                            color='prioridade_comercial',
-                            color_discrete_map={'ALTA':'red', 'MÉDIA':'orange', 'BAIXA':'green'})
+            st.subheader("Distribuição por Serviços ou Classificação")
+            coluna_grafico_2 = 'servico' if 'servico' in df.columns else ('classificacao' if 'classificacao' in df.columns else df.columns[1])
+            fig_prio = px.pie(df, names=coluna_grafico_2, hole=0.4)
             st.plotly_chart(fig_prio, use_container_width=True)
 
-        # --- Tabela de Dados e Scripts ---
-        st.subheader("Lista de Clientes para Abordagem Comercial")
+        # --- Tabela de Dados ---
+        st.subheader("Lista de Clientes Extraída das Planilhas")
         
-        # Filtro de Prioridade
-        prioridade_filtro = st.multiselect("Filtrar por Prioridade", options=["ALTA", "MÉDIA", "BAIXA"], default=["ALTA", "MÉDIA"])
-        df_filtrado = df[df['prioridade_comercial'].isin(prioridade_filtro)]
+        # Exibe colunas identificadas nas suas planilhas para o professor ver
+        colunas_exibicao = [c for c in ['codcli', 'servico', 'status_cliente', 'consultor', 'prioridade_comercial'] if c in df.columns]
+        if not colunas_exibicao:
+            colunas_exibicao = df.columns[:5].tolist() # Pega as primeiras 5 colunas se não achar as específicas
+            
+        st.dataframe(df[colunas_exibicao])
 
-        st.dataframe(df_filtrado[['codcli', 'categoria_problema', 'qtd_tickets', 'servico_sugerido', 'prioridade_comercial']])
-
-        st.subheader("Scripts Gerados (Clique para expandir)")
-        for index, row in df_filtrado.iterrows():
-            with st.expander(f"Lead ID: {row['codcli']} - {row['servico_sugerido']} (Prioridade: {row['prioridade_comercial']})"):
+        # Se houver os scripts gerados no seu pipeline final, ele os mostra aqui
+        if 'script_vendas' in df.columns:
+            st.subheader("Scripts Gerados (Clique para expandir)")
+            for index, row in df.iterrows():
+                identificador = row['codcli'] if 'codcli' in df.columns else index
                 st.text(row['script_vendas'])
+                
