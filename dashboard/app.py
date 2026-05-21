@@ -46,8 +46,8 @@ elif st.session_state["authentication_status"]:
     st.title(f"Bem-vindo ao Dashboard, {nome_usuario}!")
     
     # ⬇️ Cole o seu código antigo aqui dentro (repare no espaço no começo de cada linha):
-    df_clientes = pd.read_csv("Clientes CTI.xlsx - Clientes CTI.csv")
-    df_tickets = pd.read_csv("Result_28.xlsx - Result 1.csv")
+    df_clientes = pd.read_csv("../Clientes CTI.xlsx - Clientes CTI.csv")
+    df_tickets = pd.read_csv("../Result_28.xlsx - Result 1.csv")
     
     st.subheader("Análise de Chamados e Clientes")
     
