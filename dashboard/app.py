@@ -31,21 +31,25 @@ authenticator = stauth.Authenticate(
 )
 
 # 3. Renderizar a tela de Login
-name, authentication_status, username = authenticator.login(fields=['username', 'password'])
+# 1. Chame a função de login sem tentar desempacotar variáveis
+authenticator.login(fields=['username', 'password'])
 
-# 4. Verificar se o usuário acertou a senha
-if authentication_status == False:
+# 2. Verifique o status checando o st.session_state (Como a biblioteca funciona hoje)
+if st.session_state["authentication_status"] == False:
     st.error('Usuário ou senha incorretos.')
 
-elif authentication_status == None:
+elif st.session_state["authentication_status"] == None:
     st.warning('Por favor, insira seu usuário e senha.')
 
-elif authentication_status:
-    # SE DEU CERTO, ELE ENTRA AQUI!
-    # Coloque o botão de logout na barra lateral
+elif st.session_state["authentication_status"]:
+    # Login com sucesso!
     authenticator.logout('Sair do Sistema', 'sidebar')
     
-    st.title(f"Bem-vindo ao Dashboard, {name}!")
+    # Pegando o nome do usuário que logou
+    nome_usuario = st.session_state["name"]
+    st.title(f"Bem-vindo ao Dashboard, {nome_usuario}!")
+    
+    # --- O RESTANTE DO SEU CÓDIGO (Gráficos, pandas, etc.) CONTINUA AQUI ---
     
    #_______________________________________________________________#
 
