@@ -1,4 +1,56 @@
 import streamlit as st
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
+
+# 1. Configuração dos usuários e senhas (Criptografadas)
+# Dica: 'abcdef' é a senha criptografada para 'professor123'
+config = {
+    "credentials": {
+        "usernames": {
+            "professor": {
+                "email": "rodrigo.cti@senai.com",
+                "name": "Rodrigo",
+                "password": "$2b$12$GRZMw4/K0nC4bs.LD7pSXujdsathd4Hu9Wk7iGR4EJnSr/XSroxuW" # Senha: cti134
+            }
+        }
+    },
+    "cookie": {
+        "expiry_days": 30,
+        "key": "assinatura_secreta_do_cookie",
+        "name": "dashboard_cookie"
+    }
+}
+
+# 2. Inicializar o sistema de autenticação
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
+)
+
+# 3. Renderizar a tela de Login
+name, authentication_status, username = authenticator.login(fields=['username', 'password'])
+
+# 4. Verificar se o usuário acertou a senha
+if authentication_status == False:
+    st.error('Usuário ou senha incorretos.')
+
+elif authentication_status == None:
+    st.warning('Por favor, insira seu usuário e senha.')
+
+elif authentication_status:
+    # SE DEU CERTO, ELE ENTRA AQUI!
+    # Coloque o botão de logout na barra lateral
+    authenticator.logout('Sair do Sistema', 'sidebar')
+    
+    st.title(f"Bem-vindo ao Dashboard, {name}!")
+    
+   #_______________________________________________________________#
+
+
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
