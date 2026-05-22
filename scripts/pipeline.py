@@ -112,7 +112,7 @@ class SalesOpportunityPipeline:
                 gap_encontrado = True
                 servico_sugerido = "Acesso Dedicado Link Corporativo"
 
-            if gap_encontrado and qtd >= 1: 
+            if gap_encontrado and qtd >= 20: 
                 oportunidades.append({
                     'codcli': cliente,
                     'categoria_problema': categoria,
