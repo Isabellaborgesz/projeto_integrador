@@ -12,7 +12,7 @@ USER_EMAIL = "rodrigo.cti@senai.com"
 USER_PASSWORD = "cti134"
 
 # 🏢 INSIRA A URL DA SUA LOGO AQUI (Pode ser um link do Imgur, GitHub ou link direto da imagem)
-LOGO_URL = "https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=100&h=100&q=80" 
+LOGO_URL = "https://ibb.co/xKvML26Q" 
 
 # --- TEMPLATE HTML DA TELA DE LOGIN ---
 LOGIN_HTML = f"""
