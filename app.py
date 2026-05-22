@@ -11,11 +11,8 @@ app = FastAPI()
 USER_EMAIL = "rodrigo.cti@senai.com"
 USER_PASSWORD = "cti134"
 
-# 🏢 INSIRA A URL DA SUA LOGO AQUI (Pode ser um link do Imgur, GitHub ou link direto da imagem)
-LOGO_URL = "https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=100&h=100&q=80" 
-
 # --- TEMPLATE HTML DA TELA DE LOGIN ---
-LOGIN_HTML = f"""
+LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -25,8 +22,7 @@ LOGIN_HTML = f"""
 </head>
 <body class="bg-slate-900 flex items-center justify-center h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
     <div class="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-96 border border-slate-800/20">
-        <div class="flex flex-col items-center mb-6">
-            <img src="{LOGO_URL}" alt="Logo" class="w-16 h-16 object-cover rounded-xl mb-3 shadow-md">
+        <div class="text-center mb-6">
             <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Motor de Vendas B2B</h2>
             <p class="text-xs text-slate-500 mt-1">Insira suas credenciais corporativas</p>
         </div>
@@ -47,7 +43,7 @@ LOGIN_HTML = f"""
 """
 
 # --- TEMPLATE HTML DO DASHBOARD ---
-DASHBOARD_HTML = f"""
+DASHBOARD_HTML = """
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -59,12 +55,9 @@ DASHBOARD_HTML = f"""
     <div class="max-w-7xl mx-auto space-y-6">
         
         <div class="flex flex-col md:flex-row justify-between items-center bg-blue-900 text-white p-6 rounded-2xl shadow-xl shadow-blue-900/10 gap-4 bg-gradient-to-r from-blue-900 via-indigo-950 to-blue-900">
-            <div class="flex items-center gap-4 text-center md:text-left">
-                <img src="{LOGO_URL}" alt="Logo" class="w-14 h-14 object-cover rounded-xl border-2 border-white/20 bg-white shadow-inner">
-                <div>
-                    <h1 class="text-2xl md:text-3xl font-black tracking-tight">Motor de Oportunidades B2B</h1>
-                    <p class="text-blue-200 text-xs md:text-sm font-medium mt-0.5">Identificação de Cross-Sell e Up-Sell baseada em chamados técnicos</p>
-                </div>
+            <div class="text-center md:text-left">
+                <h1 class="text-2xl md:text-3xl font-black tracking-tight">Motor de Oportunidades B2B</h1>
+                <p class="text-blue-200 text-xs md:text-sm font-medium mt-0.5">Identificação de Cross-Sell e Up-Sell baseada em chamados técnicos</p>
             </div>
             <div class="flex items-center gap-4">
                 <span class="text-xs font-semibold bg-white/10 px-3 py-1.5 rounded-full border border-white/10">Olá, Rodrigo</span>
@@ -195,12 +188,11 @@ def login(username: str = Form(...), password: str = Form(...)):
     kpi_tickets = str(df['qtd_tickets'].sum())
     kpi_top = str(df['servico_sugerido'].mode()[0]) if not df.empty else "N/A"
 
-    # --- GRAFICO 1: Customizado com Tons Azuis de Marca ---
+    # --- GRAFICO 1 ---
     fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), 
                      x='categoria_problema', y='count',
                      labels={'categoria_problema': 'Categoria', 'count': 'Chamados'})
     
-    # Customizando as cores do gráfico para combinar com tons de azul escuro e slate
     fig_cat.update_traces(marker_color='#1E3A8A', marker_line_color='#1E293B', marker_line_width=1, opacity=0.9)
     fig_cat.update_layout(
         plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
@@ -209,7 +201,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     )
     html_g1 = pio.to_html(fig_cat, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # --- GRAFICO 2: Pizza Customizada ---
+    # --- GRAFICO 2 ---
     fig_prio = px.pie(df, names='prioridade_comercial', hole=0.55,
                       color='prioridade_comercial',
                       color_discrete_map={'ALTA':'#E11D48', 'MÉDIA':'#1E3A8A', 'BAIXA':'#475569'})
@@ -220,7 +212,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     )
     html_g2 = pio.to_html(fig_prio, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # --- LINHAS DA TABELA COM FORMATAÇÃO CLEAN ---
+    # --- LINHAS DA TABELA ---
     table_rows = ""
     for _, row in df.iterrows():
         prio = row['prioridade_comercial']
@@ -240,7 +232,7 @@ def login(username: str = Form(...), password: str = Form(...)):
         </tr>
         """
 
-    # --- ACORDEONS RETRÁTEIS CORPORATIVOS ---
+    # --- ACORDEONS RETRÁTEIS ---
     expanders = ""
     for _, row in df.iterrows():
         prio = row['prioridade_comercial']
