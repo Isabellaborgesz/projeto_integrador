@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import os
 
-# 1. Configuração da Página (OBRIGATORIAMENTE o primeiro comando do Streamlit)
+# 1. Configuração da Página
 st.set_page_config(page_title="Motor de Oportunidades B2B", layout="wide")
 
 # 2. Configurações de Usuário e Senha (rodrigo.cti@senai.com / cti134)
@@ -25,7 +25,6 @@ config = {
      }
 }
 
-# Inicializa o Autenticador
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -36,7 +35,7 @@ authenticator = stauth.Authenticate(
 # 3. Renderiza a tela de login
 authenticator.login(fields=['username', 'password'])
 
-# 4. Validações de Segurança do Login
+# 4. Validações de Segurança
 if st.session_state["authentication_status"] == False:
     st.error('Usuário ou senha incorretos.')
 
@@ -44,21 +43,16 @@ elif st.session_state["authentication_status"] == None:
     st.warning('Por favor, insira seu usuário e senha.')
 
 elif st.session_state["authentication_status"]:
-    # ⚠️ SE O LOGIN FOR BEM-SUCEDIDO, TODO O SEU DASHBOARD ORIGINAL É EXECUTADO AQUI DENTRO (COM 1 TAB DE RECUO)
-    
-    # Botão de sair na barra lateral
     authenticator.logout('Sair do Sistema', 'sidebar')
     
-    # Cabeçalho do seu Dashboard
-    st.title("Dashboard de Oportunidades de Vendas B2B")
+    st.title("🎯 Dashboard de Oportunidades de Vendas B2B")
     st.markdown(f"**Bem-vindo, {st.session_state['name']}!** Identificação automática de Cross-Sell e Up-Sell baseada em chamados de suporte técnico.")
 
-    # Carregar dados (Híbrido: Tenta Excel .xlsx primeiro, depois recua para .csv)
+    # Carregar dados (Ajustado para quando o app.py está na RAIZ)
     @st.cache_data
     def load_data():
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        caminho_xlsx = os.path.join(BASE_DIR, "output", "oportunidades.xlsx")
-        caminho_csv = os.path.join(BASE_DIR, "output", "oportunidades.csv")
+        caminho_xlsx = os.path.join("output", "oportunidades.xlsx")
+        caminho_csv = os.path.join("output", "oportunidades.csv")
         
         try:
             if os.path.exists(caminho_xlsx):
@@ -66,15 +60,15 @@ elif st.session_state["authentication_status"]:
             elif os.path.exists(caminho_csv):
                 return pd.read_csv(caminho_csv)
             return None
-        except Exception as e:
+        except Exception:
             return None
 
     df = load_data()
 
     if df is None or df.empty:
-        st.warning("Nenhum dado encontrado. Verifique se o arquivo 'oportunidades.xlsx' ou 'oportunidades.csv' existe na pasta 'output'. Se não, execute o pipeline.py primeiro.")
+        st.warning("Nenhum dado encontrado. Verifique se o arquivo 'oportunidades.xlsx' ou 'oportunidades.csv' existe na pasta 'output'.")
     else:
-        # --- KPIs Superiores ---
+        # --- KPIs ---
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total de Oportunidades", len(df))
         col2.metric("Alta Prioridade (Hot Leads)", len(df[df['prioridade_comercial'] == 'ALTA']))
@@ -86,7 +80,6 @@ elif st.session_state["authentication_status"]:
 
         # --- Gráficos ---
         c1, c2 = st.columns(2)
-
         with c1:
             st.subheader("Oportunidades por Categoria de Problema")
             fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), 
@@ -100,10 +93,8 @@ elif st.session_state["authentication_status"]:
                               color_discrete_map={'ALTA':'red', 'MÉDIA':'orange', 'BAIXA':'green'})
             st.plotly_chart(fig_prio, use_container_width=True)
 
-        # --- Tabela de Dados e Scripts ---
+        # --- Tabela e Scripts ---
         st.subheader("Lista de Clientes para Abordagem Comercial")
-        
-        # Filtro de Prioridade
         prioridade_filtro = st.multiselect("Filtrar por Prioridade", options=["ALTA", "MÉDIA", "BAIXA"], default=["ALTA", "MÉDIA"])
         df_filtrado = df[df['prioridade_comercial'].isin(prioridade_filtro)]
 
