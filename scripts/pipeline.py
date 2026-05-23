@@ -37,7 +37,7 @@ class SalesOpportunityPipeline:
         print(f"Tickets carregados: {self.df_tickets.shape[0]} linhas, {self.df_tickets.shape[1]} colunas.")
         print(f"Clientes carregados: {self.df_clients.shape[0]} linhas, {self.df_clients.shape[1]} colunas.")
 
-   # ==========================================
+    # ==========================================
     # ETAPA 2 - LIMPEZA, PADRONIZAÇÃO E NLP
     # ==========================================
     def clean_and_categorize(self):
@@ -69,10 +69,10 @@ class SalesOpportunityPipeline:
         self.df_tickets['categoria_nlp'] = self.df_tickets['texto_limpo'].apply(categorize_text)
 
     # ==========================================
-    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES
+    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (ALTERADA)
     # ==========================================
     def model_opportunities(self):
-        print("--- ETAPA 3: Cruzamento Tickets x Serviços Contratados ---")
+        print("--- ETAPA 3: Cruzamento Tickets x Serviços Contratados (Filtrando Poucos Serviços) ---")
         
         # Checar se a coluna 'codcli' existe (cliente ID)
         if 'codcli' not in self.df_clients.columns or 'codcli' not in self.df_tickets.columns:
@@ -99,6 +99,14 @@ class SalesOpportunityPipeline:
             qtd = row['qtd_tickets']
             servicos = row['servicos_contratados']
 
+            # --- NOVA LÓGICA: Contar quantos serviços o cliente tem ativo atualmente ---
+            # Como seus serviços estão separados por vírgula (Ex: "FIBRA, ANTIVIRUS"), 
+            # contamos quantas vírgulas existem + 1. Se estiver vazio, o total é 0.
+            if servicos.strip() == "":
+                total_servicos = 0
+            else:
+                total_servicos = len(servicos.split(','))
+
             gap_encontrado = False
             servico_sugerido = ""
 
@@ -112,7 +120,11 @@ class SalesOpportunityPipeline:
                 gap_encontrado = True
                 servico_sugerido = "Acesso Dedicado Link Corporativo"
 
-            if gap_encontrado and qtd >= 20: 
+            # --- FILTRO RESTRITIVO ALTERADO ---
+            # O cliente precisa ter o GAP técnico, ter mais de 20 tickets E possuir POUCOS serviços contratados (ex: no máximo 2)
+            MAX_SERVICOS_PERMITIDOS = 2 
+            
+            if gap_encontrado and qtd >= 20 and total_servicos <= MAX_SERVICOS_PERMITIDOS: 
                 oportunidades.append({
                     'codcli': cliente,
                     'categoria_problema': categoria,
@@ -122,6 +134,7 @@ class SalesOpportunityPipeline:
                 })
         
         self.df_opps = pd.DataFrame(oportunidades)
+        print(f"Oportunidades filtradas geradas: {self.df_opps.shape[0]} registros.")
 
     # ==========================================
     # ETAPA 4 - SCORE DE OPORTUNIDADE
@@ -194,10 +207,8 @@ Como vocês ainda não possuem nosso serviço de {row['servico_sugerido']}, gost
         self.export_data()
 
 if __name__ == "__main__":
-    # Caminho absoluto para evitar qualquer erro de FileNotFoundError
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    # ATENÇÃO: Verifique se as planilhas estão com esses exatos nomes na pasta data/raw
     caminho_tickets = os.path.join(BASE_DIR, "data", "raw", "Result_28.xlsx")
     caminho_clientes = os.path.join(BASE_DIR, "data", "raw", "Clientes CTI.xlsx")
     caminho_output = os.path.join(BASE_DIR, "output")
@@ -211,3 +222,4 @@ if __name__ == "__main__":
         output_dir=caminho_output
     )
     pipeline.run()
+    
