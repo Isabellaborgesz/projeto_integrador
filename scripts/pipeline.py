@@ -150,8 +150,8 @@ class SalesOpportunityPipeline:
         self.df_opps['score_bruto'] = self.df_opps['qtd_tickets'] * self.df_opps['peso']
 
         def classificar_score(score):
-            if score >= 15: return "ALTA"
-            elif score >= 6: return "MÉDIA"
+            if score >= 100: return "ALTA"
+            elif score >= 50: return "MÉDIA"
             else: return "BAIXA"
 
         self.df_opps['prioridade_comercial'] = self.df_opps['score_bruto'].apply(classificar_score)
@@ -222,4 +222,3 @@ if __name__ == "__main__":
         output_dir=caminho_output
     )
     pipeline.run()
-    
