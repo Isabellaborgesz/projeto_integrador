@@ -99,12 +99,12 @@ class SalesOpportunityPipeline:
         )
 
     # ==========================================
-    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (FOCO EM SEGMENTO & GAP)
+    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (AGRESSIVA: GAP + ATIVAÇÃO POR DOR)
     # ==========================================
     def model_opportunities(self):
         print(
-            "--- ETAPA 3: Inteligência de Cross-Selling por Segmento de Mercado"
-            " ---"
+            "--- ETAPA 3: Inteligência de Cross-Selling com Filtro de Ativação"
+            " por Dor ---"
         )
 
         if (
@@ -208,16 +208,24 @@ class SalesOpportunityPipeline:
             ):
                 categoria_relacionada = "HOSPEDAGEM/CLOUD"
 
-            # CORREÇÃO: Resgata a quantidade real de chamados (0 se não houver)
+            # Resgata a quantidade real de chamados (0 se não houver)
             qtd_tickets_dor = tickets_dict.get(cliente_id, {}).get(
                 categoria_relacionada, 0
             )
+
+            # ------------------------------------------------------------------------
+            # MUDANÇA CRUCIAL: FILTRO DE ATIVAÇÃO POR DOR REAL
+            # Se o cliente passou o ano sem reclamações na área técnica do produto, 
+            # ele é descartado do pipeline para reduzir o ruído (eliminando os 2.194 leads soltos).
+            # ------------------------------------------------------------------------
+            if qtd_tickets_dor == 0:
+                continue
 
             oportunidades.append({
                 "codcli": cliente_id,
                 "segmento": segmento_cliente,
                 "categoria_problema": categoria_relacionada,
-                "qtd_tickets": qtd_tickets_dor,  # Mantém o valor real de tickets sem distorcer o score
+                "qtd_tickets": qtd_tickets_dor,  # Valor real de tickets reincidentes no ano
                 "servicos_contratados": ", ".join(servicos_atuais),
                 "servico_sugerido": servico_sugerido,
             })
@@ -225,7 +233,7 @@ class SalesOpportunityPipeline:
         self.df_opps = pd.DataFrame(oportunidades)
 
     # ==========================================
-    # ETAPA 4 - SCORE DE OPORTUNIDADE (CORRIGIDO: DISTRIBUIÇÃO ESTATÍSTICA)
+    # ETAPA 4 - SCORE DE OPORTUNIDADE (DISTRIBUIÇÃO ESTATÍSTICA ACADÊMICA)
     # ==========================================
     def score_opportunities(self):
         print(
@@ -248,12 +256,11 @@ class SalesOpportunityPipeline:
         )
 
         # 2. Aplicação da Fórmula Acadêmica: Score = Peso * (1 + Qtd_Tickets)
-        # Garante pontuação mínima para leads puramente comerciais e eleva exponencialmente os geradores de crise
         self.df_opps["score_bruto"] = self.df_opps["peso_produto"] * (
             1 + self.df_opps["qtd_tickets"]
         )
 
-        # 3. Classificação Dinâmica por Tercis (Quantiles) com base nos dados do período de 1 ano
+        # 3. Classificação Dinâmica por Tercis (Quantiles) baseada na volumetria anual
         try:
             self.df_opps["prioridade_comercial"] = pd.qcut(
                 self.df_opps["score_bruto"].rank(method="first"),
@@ -261,7 +268,6 @@ class SalesOpportunityPipeline:
                 labels=["BAIXA", "MÉDIA", "ALTA"],
             )
         except ValueError:
-            # Fallback de segurança para bases excessivamente homogêneas ou reduzidas
             self.df_opps["prioridade_comercial"] = "MÉDIA"
 
     # ==========================================
@@ -301,16 +307,13 @@ SCRIPT DE ABORDAGEM DE ALTO IMPACTO (BENCHMARKING + SUPORTE):
 
 
 # ==========================================
-# EXEMPLO DE EXECUÇÃO DA BASE (Uso do Grupo)
+# EXEMPLO DE EXECUÇÃO DA BASE
 # ==========================================
 if __name__ == "__main__":
-    # Substitua pelos caminhos reais das planilhas do seu trabalho acadêmico
     pipeline = SalesOpportunityPipeline(
         tickets_path="tickets.xlsx",
         clients_path="clientes.xlsx",
         output_dir="resultado/",
     )
-
-    # Executa todo o fluxo de inteligência de dados de ponta a ponta
     # pipeline.execute_pipeline()
     pass
