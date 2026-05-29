@@ -1,9 +1,9 @@
 import os
+import pandas as pd
+import numpy as np
+import spacy
 import re
 from datetime import datetime
-import numpy as np
-import pandas as pd
-import spacy
 
 # Carregar modelo NLP em Português do spaCy
 try:
@@ -11,9 +11,7 @@ try:
 except OSError:
     print("Modelo spaCy não encontrado. Verifique a instalação.")
 
-
 class SalesOpportunityPipeline:
-
     def __init__(self, tickets_path, clients_path, output_dir):
         self.tickets_path = tickets_path
         self.clients_path = clients_path
@@ -28,26 +26,15 @@ class SalesOpportunityPipeline:
     def load_and_profile_data(self):
         print("--- ETAPA 1: Lendo e Diagnosticando Dados ---")
 
-        # Lendo os arquivos Excel corretamente
         self.df_tickets = pd.read_excel(self.tickets_path)
         self.df_clients = pd.read_excel(self.clients_path)
 
         # Padronizar nomes de colunas
-        self.df_tickets.columns = [
-            str(c).strip().lower().replace(" ", "_")
-            for c in self.df_tickets.columns
-        ]
-        self.df_clients.columns = [
-            str(c).strip().lower().replace(" ", "_")
-            for c in self.df_clients.columns
-        ]
+        self.df_tickets.columns = [str(c).strip().lower().replace(' ', '_') for c in self.df_tickets.columns]
+        self.df_clients.columns = [str(c).strip().lower().replace(' ', '_') for c in self.df_clients.columns]
 
-        print(
-            f"Tickets carregados: {self.df_tickets.shape[0]} linhas, {self.df_tickets.shape[1]} colunas."
-        )
-        print(
-            f"Clientes carregados: {self.df_clients.shape[0]} linhas, {self.df_clients.shape[1]} colunas."
-        )
+        print(f"Tickets carregados: {self.df_tickets.shape[0]} linhas, {self.df_tickets.shape[1]} colunas.")
+        print(f"Clientes carregados: {self.df_clients.shape[0]} linhas, {self.df_clients.shape[1]} colunas.")
 
     # ==========================================
     # ETAPA 2 - LIMPEZA, PADRONIZAÇÃO E NLP
@@ -55,37 +42,18 @@ class SalesOpportunityPipeline:
     def clean_and_categorize(self):
         print("--- ETAPA 2: Processamento de NLP e Limpeza ---")
 
-        # Juntar título e mensagem para o texto do ticket e preencher nulos
-        titulo = self.df_tickets.get("titulo", pd.Series(dtype=str)).fillna("")
-        mensagem = self.df_tickets.get("mensagem", pd.Series(dtype=str)).fillna(
-            ""
-        )
+        titulo = self.df_tickets.get('titulo', pd.Series(dtype=str)).fillna('')
+        mensagem = self.df_tickets.get('mensagem', pd.Series(dtype=str)).fillna('')
         texto_ticket = titulo.astype(str) + " " + mensagem.astype(str)
 
-        self.df_tickets["texto_limpo"] = texto_ticket.str.lower()
-
-        # Regex para limpar caracteres (Evita erro de float)
-        self.df_tickets["texto_limpo"] = self.df_tickets["texto_limpo"].apply(
-            lambda x: re.sub(r"[^a-zá-ú0-9\s]", " ", str(x))
-        )
+        self.df_tickets['texto_limpo'] = texto_ticket.str.lower()
+        self.df_tickets['texto_limpo'] = self.df_tickets['texto_limpo'].apply(lambda x: re.sub(r'[^a-zá-ú0-9\s]', ' ', str(x)))
 
         regras_categorias = {
-            "INTERNET/REDE": (
-                r"\b(wifi|internet lenta|caiu|sem"
-                r" conexao|rompimento|link"
-                r" indisponivel|dns|dhcp|vlan)\b"
-            ),
-            "BACKUP": (
-                r"\b(backup falhou|erro"
-                r" backup|snapshot|restore|restaurar|perda de dados)\b"
-            ),
-            "SEGURANÇA": (
-                r"\b(virus|antivirus|firewall|fortinet|ataque|vulnerabilidade|bloqueio|spam)\b"
-            ),
-            "HOSPEDAGEM/CLOUD": (
-                r"\b(hospedagem|dominio|email|cname|apontamento"
-                r" dns|servidor virtual|vps)\b"
-            ),
+            "INTERNET/REDE": r"\b(wifi|internet lenta|caiu|sem conexao|rompimento|link indisponivel|dns|dhcp|vlan)\b",
+            "BACKUP": r"\b(backup falhou|erro backup|snapshot|restore|restaurar|perda de dados)\b",
+            "SEGURANÇA": r"\b(virus|antivirus|firewall|fortinet|ataque|vulnerabilidade|bloqueio|spam)\b",
+            "HOSPEDAGEM/CLOUD": r"\b(hospedagem|dominio|email|cname|apontamento dns|servidor virtual|vps)\b"
         }
 
         def categorize_text(text):
@@ -94,233 +62,157 @@ class SalesOpportunityPipeline:
                     return categoria
             return "OUTROS"
 
-        self.df_tickets["categoria_nlp"] = self.df_tickets["texto_limpo"].apply(
-            categorize_text
-        )
+        self.df_tickets['categoria_nlp'] = self.df_tickets['texto_limpo'].apply(categorize_text)
 
     # ==========================================
-    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (AGRESSIVA: GAP + ATIVAÇÃO POR DOR)
+    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES
     # ==========================================
     def model_opportunities(self):
-        print(
-            "--- ETAPA 3: Inteligência de Cross-Selling com Filtro de Ativação"
-            " por Dor ---"
-        )
+        print("--- ETAPA 3: Cruzamento Tickets x Serviços Contratados ---")
 
-        if (
-            "codcli" not in self.df_clients.columns
-            or "servico" not in self.df_clients.columns
-        ):
-            print(
-                "Erro: As colunas 'codcli' ou 'servico' não foram encontradas"
-                " na planilha Clientes."
-            )
+        if 'codcli' not in self.df_clients.columns or 'codcli' not in self.df_tickets.columns:
+            print("Erro: A coluna 'codcli' (ID do cliente) não foi encontrada nas planilhas.")
             self.df_opps = pd.DataFrame()
             return
 
-        if "segmento" not in self.df_clients.columns:
-            self.df_clients["segmento"] = "Geral"
+        servicos_por_cliente = self.df_clients.groupby('codcli')['servico'].apply(
+            lambda x: ', '.join(x.dropna().astype(str).str.upper())
+        ).reset_index()
+        servicos_por_cliente.rename(columns={'servico': 'servicos_contratados'}, inplace=True)
 
-        # Mapeamento do segmento por cliente
-        mapeamento_segmentos = (
-            self.df_clients.groupby("codcli")["segmento"].first().to_dict()
-        )
+        recorrencia_tickets = self.df_tickets.groupby(['codcli', 'categoria_nlp']).agg(
+            qtd_tickets=('id_ticket', 'count')
+        ).reset_index()
 
-        # Ranking de popularidade de serviços por segmento
-        ranking_servicos_segmento = (
-            self.df_clients.groupby(["segmento", "servico"])
-            .size()
-            .reset_index(name="frequencia")
-        )
-        ranking_servicos_segmento = ranking_servicos_segmento.sort_values(
-            by=["segmento", "frequencia"], ascending=[True, False]
-        )
+        df_cruzamento = pd.merge(recorrencia_tickets, servicos_por_cliente, on='codcli', how='left')
+        df_cruzamento['servicos_contratados'] = df_cruzamento['servicos_contratados'].fillna('')
 
-        # Serviços que cada cliente já possui
-        servicos_por_cliente = (
-            self.df_clients.groupby("codcli")["servico"]
-            .apply(lambda x: list(x.dropna().astype(str).str.upper()))
-            .to_dict()
-        )
-
-        # Volumetria de chamados por categoria técnica
-        if "codcli" in self.df_tickets.columns:
-            recorrencia_tickets = (
-                self.df_tickets.groupby(["codcli", "categoria_nlp"])
-                .size()
-                .reset_index(name="qtd_tickets")
-            )
-            tickets_dict = (
-                recorrencia_tickets.groupby("codcli")
-                .apply(
-                    lambda x: dict(zip(x["categoria_nlp"], x["qtd_tickets"]))
-                )
-                .to_dict()
-            )
-        else:
-            tickets_dict = {}
+        # Capturar o segmento mapeado se existir na planilha de clientes
+        segmentos = {}
+        if 'segmento' in self.df_clients.columns:
+            segmentos = self.df_clients.set_index('codcli')['segmento'].to_dict()
 
         oportunidades = []
+        for _, row in df_cruzamento.iterrows():
+            cliente = row['codcli']
+            categoria = row['categoria_nlp']
+            qtd = row['qtd_tickets']
+            servicos = row['servicos_contratados']
 
-        for cliente_id in servicos_por_cliente.keys():
-            segmento_cliente = mapeamento_segmentos.get(cliente_id, "Geral")
-            servicos_atuais = servicos_por_cliente.get(cliente_id, [])
+            gap_encontrado = False
+            servico_sugerido = ""
 
-            # Buscar os serviços mais comuns dos concorrentes no mesmo segmento
-            servicos_populares_no_segmento = ranking_servicos_segmento[
-                ranking_servicos_segmento["segmento"] == segmento_cliente
-            ]
+            if categoria == "BACKUP" and "BACKUP" not in servicos:
+                gap_encontrado = True
+                servico_sugerido = "Backup Gerenciado"
+            elif categoria == "SEGURANÇA" and ("FIREWALL" not in servicos and "ANTIVIRUS" not in servicos):
+                gap_encontrado = True
+                servico_sugerido = "Pacote de Cibersegurança / Firewall"
+            elif categoria == "INTERNET/REDE" and "ACESSO DEDICADO" not in servicos:
+                gap_encontrado = True
+                servico_sugerido = "Acesso Dedicado Link Corporativo"
 
-            servico_sugerido = None
-            for _, item in servicos_populares_no_segmento.iterrows():
-                servico_analisado = str(item["servico"]).upper()
-
-                # Se o cliente NÃO possui o serviço mais popular do segmento dele, este é o nosso alvo comercial
-                if servico_analisado not in servicos_atuais:
-                    servico_sugerido = item["servico"]
-                    break
-
-            # Se o cliente já for completo no segmento, não geramos oportunidade
-            if not servico_sugerido:
-                continue
-
-            # Mapeamento para buscar a dor técnica (tickets) associada ao serviço sugerido
-            categoria_relacionada = "OUTROS"
-            servico_sugerido_upper = str(servico_sugerido).upper()
-            if "BACKUP" in servico_sugerido_upper:
-                categoria_relacionada = "BACKUP"
-            elif (
-                "FIREWALL" in servico_sugerido_upper
-                or "ANTIVIRUS" in servico_sugerido_upper
-                or "SEGURANÇA" in servico_sugerido_upper
-            ):
-                categoria_relacionada = "SEGURANÇA"
-            elif (
-                "LINK" in servico_sugerido_upper
-                or "DEDICADO" in servico_sugerido_upper
-                or "REDE" in servico_sugerido_upper
-            ):
-                categoria_relacionada = "INTERNET/REDE"
-            elif (
-                "CLOUD" in servico_sugerido_upper
-                or "SERVIDOR" in servico_sugerido_upper
-                or "HOSPEDAGEM" in servico_sugerido_upper
-            ):
-                categoria_relacionada = "HOSPEDAGEM/CLOUD"
-
-            # Resgata a quantidade real de chamados (0 se não houver)
-            qtd_tickets_dor = tickets_dict.get(cliente_id, {}).get(
-                categoria_relacionada, 0
-            )
-
-            # ------------------------------------------------------------------------
-            # MUDANÇA CRUCIAL: FILTRO DE ATIVAÇÃO POR DOR REAL
-            # Se o cliente passou o ano sem reclamações na área técnica do produto, 
-            # ele é descartado do pipeline para reduzir o ruído (eliminando os 2.194 leads soltos).
-            # ------------------------------------------------------------------------
-# ... código anterior ...
-            qtd_tickets_dor = tickets_dict.get(cliente_id, {}).get(categoria_relacionada, 0)
-
-            # ADICIONE ESTES PRINTS DE DIAGNÓSTICO:
-            if len(oportunidades) < 5: # Vai mostrar apenas os 5 primeiros para não inundar a tela
-                print(f"DEBUG - Cliente: {cliente_id} | Serviço Sugerido: {servico_sugerido} | Categoria: {categoria_relacionada} | Qtd Tickets: {qtd_tickets_dor}")
-
-            if qtd_tickets_dor == 0:
-                continue
-
-            oportunidades.append({
-                "codcli": cliente_id,
-                "segmento": segmento_cliente,
-                "categoria_problema": categoria_relacionada,
-                "qtd_tickets": qtd_tickets_dor,  # Valor real de tickets reincidentes no ano
-                "servicos_contratados": ", ".join(servicos_atuais),
-                "servico_sugerido": servico_sugerido,
-            })
-
+            if gap_encontrado and qtd >= 1: 
+                oportunidades.append({
+                    'codcli': cliente,
+                    'segmento': segmentos.get(cliente, "Não Informado"),
+                    'categoria_problema': categoria,
+                    'qtd_tickets': qtd,
+                    'servicos_contratados': servicos,
+                    'servico_sugerido': servico_sugerido
+                })
+        
         self.df_opps = pd.DataFrame(oportunidades)
 
     # ==========================================
-    # ETAPA 4 - SCORE DE OPORTUNIDADE (DISTRIBUIÇÃO ESTATÍSTICA ACADÊMICA)
+    # ETAPA 4 - SCORE DE OPORTUNIDADE
     # ==========================================
     def score_opportunities(self):
-        print(
-            "--- ETAPA 4: Calculando Score Baseado em Distribuição Estatística"
-            " ---"
-        )
+        print("--- ETAPA 4: Calculando Score de Lead ---")
         if self.df_opps.empty:
+            print("Nenhuma oportunidade encontrada.")
             return
 
-        # 1. Definição dos Pesos Estratégicos (Pesos de Negócio)
-        peso_categoria = {
-            "BACKUP": 3,
-            "SEGURANÇA": 3,
-            "INTERNET/REDE": 2,
-            "HOSPEDAGEM/CLOUD": 2,
-            "OUTROS": 1,
-        }
-        self.df_opps["peso_produto"] = (
-            self.df_opps["categoria_problema"].map(peso_categoria).fillna(1)
-        )
+        peso_categoria = {"BACKUP": 3, "SEGURANÇA": 3, "INTERNET/REDE": 2, "HOSPEDAGEM/CLOUD": 1, "OUTROS": 1}
+        self.df_opps['peso'] = self.df_opps['categoria_problema'].map(peso_categoria)
+        self.df_opps['score_bruto'] = self.df_opps['qtd_tickets'] * self.df_opps['peso']
 
-        # 2. Aplicação da Fórmula Acadêmica: Score = Peso * (1 + Qtd_Tickets)
-        self.df_opps["score_bruto"] = self.df_opps["peso_produto"] * (
-            1 + self.df_opps["qtd_tickets"]
-        )
+        def classificar_score(score):
+            if score >= 15: return "ALTA"
+            elif score >= 6: return "MÉDIA"
+            else: return "BAIXA"
 
-        # 3. Classificação Dinâmica por Tercis (Quantiles) baseada na volumetria anual
-        try:
-            self.df_opps["prioridade_comercial"] = pd.qcut(
-                self.df_opps["score_bruto"].rank(method="first"),
-                q=3,
-                labels=["BAIXA", "MÉDIA", "ALTA"],
-            )
-        except ValueError:
-            self.df_opps["prioridade_comercial"] = "MÉDIA"
+        self.df_opps['prioridade_comercial'] = self.df_opps['score_bruto'].apply(classificar_score)
 
     # ==========================================
-    # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL UNIFICADO
+    # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL
     # ==========================================
     def generate_sales_script(self):
         print("--- ETAPAS 5 e 6: Gerando Recomendações e Scripts ---")
-        if self.df_opps.empty:
-            return
+        if self.df_opps.empty: return
 
         scripts = []
         for _, row in self.df_opps.iterrows():
             script = f"""
 Cliente (ID): {row['codcli']}
-Segmento de Mercado: {row['segmento']}
+Problema Recorrente: {row['categoria_problema']} ({row['qtd_tickets']} tickets abertos)
 Serviços Atuais: {row['servicos_contratados']}
-Serviço Sugerido (Gap de Segmento): {row['servico_sugerido']}
-Prioridade: {row['prioridade_comercial']} (Score baseado em {row['qtd_tickets']} chamados de {row['categoria_problema']})
+Serviço Sugerido: {row['servico_sugerido']}
+Prioridade: {row['prioridade_comercial']}
 
-SCRIPT DE ABORDAGEM DE ALTO IMPACTO (BENCHMARKING + SUPORTE):
-"Olá! Estava analisando os investimentos em tecnologia das empresas do segmento de {row['segmento']}, que é o mesmo setor de vocês. Notamos que mais de 75% dos seus concorrentes diretos utilizam o serviço de {row['servico_sugerido']} para mitigar gargalos operacionais. Como vocês ainda não contam com essa camada ativa no contrato, e considerando que mapeamos algumas instabilidades recentes no seu suporte com temas de {row['categoria_problema']}, gostaria de agendar um breve bate-papo de 10 minutos. Quero te apresentar o estudo de caso prático desse serviço no seu mercado para eliminar esses chamados de vez. Qual o melhor dia?"
-"""
+SCRIPT DE ABORDAGEM:
+"Olá, notei que sua equipe tem aberto chamados técnicos relacionados a {row['categoria_problema']}. 
+Como vocês ainda não possuem nosso serviço de {row['servico_sugerido']}, gostaria de agendar uma reunião de 15 minutos para apresentar como essa solução eliminaria esses incidentes. Que tal amanhã à tarde?"
+            """
             scripts.append(script.strip())
 
-        self.df_opps["script_vendas"] = scripts
+        self.df_opps['script_vendas'] = scripts
 
     # ==========================================
-    # ORQUESTRADOR DO PIPELINE
+    # ETAPA 8 - EXPORTAÇÃO
     # ==========================================
-    def execute_pipeline(self):
+    def export_data(self):
+        print("--- ETAPA 8: Exportando Resultados ---")
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        if not self.df_opps.empty:
+            self.df_opps.to_csv(os.path.join(self.output_dir, "oportunidades.csv"), index=False)
+            self.df_opps.to_excel(os.path.join(self.output_dir, "oportunidades.xlsx"), index=False)
+
+            with open(os.path.join(self.output_dir, "scripts_comerciais.txt"), "w", encoding="utf-8") as f:
+                for script in self.df_opps['script_vendas']:
+                    f.write(script + "\n" + "-"*80 + "\n\n")
+            print(f"Arquivos exportados com sucesso na pasta: {self.output_dir}")
+        else:
+            print("Não houve dados para exportar.")
+
+    def run(self):
         self.load_and_profile_data()
         self.clean_and_categorize()
         self.model_opportunities()
         self.score_opportunities()
         self.generate_sales_script()
-        print("--- Pipeline executado com sucesso! ---")
+        self.export_data()
 
-
-# ==========================================
-# EXEMPLO DE EXECUÇÃO DA BASE
-# ==========================================
 if __name__ == "__main__":
+    # Caminho do script atual
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    
+    # Sobe um nível para a raiz do projeto (C:\Users\Cliente\Documents\GitHub\DASHBOARD)
+    BASE_DIR = os.path.dirname(SCRIPT_DIR)
+
+    # Agora os caminhos vão apontar corretamente para a raiz do projeto
+    caminho_tickets = os.path.join(BASE_DIR, "data", "raw", "Result_28.xlsx")
+    caminho_clientes = os.path.join(BASE_DIR, "data", "raw", "Clientes CTI.xlsx")
+    caminho_output = os.path.join(BASE_DIR, "output")
+
+    print(f"Buscando tickets em: {caminho_tickets}")
+    print(f"Buscando clientes em: {caminho_clientes}")
+
     pipeline = SalesOpportunityPipeline(
-        tickets_path="tickets.xlsx",
-        clients_path="clientes.xlsx",
-        output_dir="resultado/",
+        tickets_path=caminho_tickets, 
+        clients_path=caminho_clientes,
+        output_dir=caminho_output
     )
-    # pipeline.execute_pipeline()
-    pass
+    # Executa o processo completo
+    pipeline.run()
