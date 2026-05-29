@@ -64,86 +64,69 @@ class SalesOpportunityPipeline:
 
         self.df_tickets['categoria_nlp'] = self.df_tickets['texto_limpo'].apply(categorize_text)
 
-    # ==========================================
-    # ETAPA 3 - MODELAGEM RIGOROSA DE GAPS
+# ==========================================
+    # ETAPA 3 - MODELAGEM SIMPLIFICADA E ROBUSTA
     # ==========================================
     def model_opportunities(self):
-        print("--- ETAPA 3: Modelagem de Oportunidades com Filtro Rigoroso ---")
+        print("--- ETAPA 3: Modelagem de Oportunidades Simplificada ---")
 
         if 'codcli' not in self.df_clients.columns or 'codcli' not in self.df_tickets.columns:
             print("Erro: A coluna 'codcli' não foi encontrada nas planilhas.")
             self.df_opps = pd.DataFrame()
             return
 
-        # Agrupamento inicial de volumetria por dor
+        # 1. Identificar quais categorias de problemas cada cliente teve (e quantos tickets)
         recorrencia = self.df_tickets.groupby(['codcli', 'categoria_nlp']).size().reset_index(name='qtd_tickets')
+        
+        # Filtrar o saco de gatos: não faz sentido vender produto para a categoria "OUTROS"
         recorrencia = recorrencia[recorrencia['categoria_nlp'] != 'OUTROS']
 
-        # Dicionário de serviços ativos por cliente
+        # 2. Criar um dicionário rápido para saber o que cada cliente JÁ TEM contratado
+        # Isso evita fazer merges complexos que mudam os nomes das colunas
         servicos_por_cliente = self.df_clients.groupby('codcli')['servico'].apply(
             lambda x: list(x.dropna().astype(str).str.upper())
         ).to_dict()
 
-        # Dicionário de segmentos
+        # Pegar os segmentos dos clientes
         segmentos = {}
         if 'segmento' in self.df_clients.columns:
             segmentos = self.df_clients.set_index('codcli')['segmento'].to_dict()
 
         oportunidades = []
 
+        # 3. Varrer a lista de dores e checar se há o GAP no contrato
         for _, row in recorrencia.iterrows():
             cliente = row['codcli']
             categoria = row['categoria_nlp']
             qtd = row['qtd_tickets']
             
+            # Buscar o que esse cliente específico já tem em contrato (lista vazia se não achar)
             contratos_cliente = servicos_por_cliente.get(cliente, [])
+            
+            # Unificar todos os contratos em uma string única para facilitar a busca por palavra-chave
             texto_contratos = " ".join(contratos_cliente)
 
             gap_encontrado = False
             servico_sugerido = ""
-            motivo_abordagem = ""
-            
-            # -------------------------------------------------------------
-            # REGRAS RESTRITIVAS CRUZADAS (DOR VS CONTRATO ATUAL)
-            # -------------------------------------------------------------
-            if categoria == "BACKUP":
-                # Filtro: Só incomoda comercialmente se tiver dores repetitivas (Mínimo 3 chamados)
-                if "BACKUP" not in texto_contratos and qtd >= 3:
-                    gap_encontrado = True
-                    servico_sugerido = "Backup Gerenciado"
-                    motivo_abordagem = "implementar uma rotina 100% automatizada e monitorada de cópias de segurança"
 
-            elif categoria == "SEGURANÇA":
-                # CORREÇÃO CIRÚRGICA ANTIGAFE: Se ele já possui infra da Fortinet ou Firewall ativo
-                if any(w in texto_contratos for w in ["FORTINET", "FIREWALL"]):
-                    # Se o volume for alarmante (Ex: o caso do cliente 830 com mais de 15 chamados)
-                    if qtd >= 15:
-                        gap_encontrado = True
-                        servico_sugerido = "Monitoramento Avançado SOC / Consultoria SecOps"
-                        motivo_abordagem = f"auditar e otimizar as regras do seu Firewall Fortinet atual para conter esses {qtd} incidentes recorrentes"
-                    else:
-                        # Se forem poucos chamados de segurança para quem já tem Fortinet, desconsidera o lead
-                        continue
-                # Se ele realmente está desprotegido (Sem antivírus corporativo ou segurança de borda)
-                elif "ANTIVIRUS" not in texto_contratos and qtd >= 3:
-                    gap_encontrado = True
-                    servico_sugerido = "Pacote de Cibersegurança / Firewall"
-                    motivo_abordagem = "implementar uma barreira perimetral contra invasões e malwares no gateway da sua rede"
+            # Regras diretas baseadas na dor do chamado vs o que falta no contrato
+            if categoria == "BACKUP" and "BACKUP" not in texto_contratos:
+                gap_encontrado = True
+                servico_sugerido = "Backup Gerenciado"
+                
+            elif categoria == "SEGURANÇA" and not any(w in texto_contratos for w in ["FIREWALL", "ANTIVIRUS", "SEGURANÇA"]):
+                gap_encontrado = True
+                servico_sugerido = "Pacote de Cibersegurança / Firewall"
+                
+            elif categoria == "INTERNET/REDE" and not any(w in texto_contratos for w in ["DEDICADO", "LINK", "REDE"]):
+                gap_encontrado = True
+                servico_sugerido = "Acesso Dedicado Link Corporativo"
+                
+            elif categoria == "HOSPEDAGEM/CLOUD" and not any(w in texto_contratos for w in ["CLOUD", "HOSPEDAGEM", "VIRTUAL"]):
+                gap_encontrado = True
+                servico_sugerido = "Migração para Nuvem / Cloud Dedicado"
 
-            elif categoria == "INTERNET/REDE":
-                # Filtro rigoroso: Ignorar oscilações baixas. Só atacar gaps se houver gargalo sistêmico (Qtd >= 5)
-                if not any(w in texto_contratos for w in ["DEDICADO", "LINK", "REDE"]) and qtd >= 5:
-                    gap_encontrado = True
-                    servico_sugerido = "Acesso Dedicado Link Corporativo"
-                    motivo_abordagem = "substituir links de internet instáveis por uma conexão redundante com garantia de entrega (SLA)"
-
-            elif categoria == "HOSPEDAGEM/CLOUD":
-                # Filtro rigoroso: Apenas se houver gargalo severo em servidores legados (Qtd >= 4)
-                if not any(w in texto_contratos for w in ["CLOUD", "HOSPEDAGEM", "VIRTUAL"]) and qtd >= 4:
-                    gap_encontrado = True
-                    servico_sugerido = "Migração para Nuvem / Cloud Dedicado"
-                    motivo_abordagem = "migrar seus serviços locais instáveis para um ambiente Cloud de alta performance"
-
+            # Se encontrou a dor e o cliente não paga por esse serviço: temos uma oportunidade!
             if gap_encontrado:
                 oportunidades.append({
                     'codcli': cliente,
@@ -151,69 +134,57 @@ class SalesOpportunityPipeline:
                     'categoria_problema': categoria,
                     'qtd_tickets': qtd,
                     'servicos_contratados': ", ".join(contratos_cliente) if contratos_cliente else "Nenhum Serviço Ativo",
-                    'servico_sugerido': servico_sugerido,
-                    'motivo_abordagem': motivo_abordagem
+                    'servico_sugerido': servico_sugerido
                 })
 
         self.df_opps = pd.DataFrame(oportunidades)
+        print(f"Processamento concluído. Oportunidades reais geradas: {self.df_opps.shape[0]}")
 
     # ==========================================
-    # ETAPA 4 - SCORE COMERCIAL CRÍTICO E RIGOROSO
+    # ETAPA 4 - SCORE COMERCIAL SIMPLIFICADO
     # ==========================================
     def score_opportunities(self):
-        print("--- ETAPA 4: Calculando Score Rigoroso ---")
+        print("--- ETAPA 4: Calculando Score Simplificado ---")
         if self.df_opps.empty:
             return
 
-        # Multiplicador de peso por criticidade técnica da dor
-        peso_categoria = {"SEGURANÇA": 4, "BACKUP": 3, "INTERNET/REDE": 2, "HOSPEDAGEM/CLOUD": 1}
-        
-        self.df_opps['peso'] = self.df_opps['categoria_problema'].map(peso_categoria).fillna(1)
-        self.df_opps['score_bruto'] = self.df_opps['qtd_tickets'] * self.df_opps['peso']
-
-        # Elevação drástica da régua de corte para enxugar a volumetria final do funil
-        def definir_prioridade_estrita(score):
-            if score >= 40: return "ALTA"
-            elif score >= 15: return "MÉDIA"
+        # Regra comercial baseada no volume de dor (recorrência de chamados)
+        def definir_prioridade(qtd):
+            if qtd >= 5: return "ALTA"
+            elif qtd >= 2: return "MÉDIA"
             else: return "BAIXA"
 
-        self.df_opps['prioridade_comercial'] = self.df_opps['score_bruto'].apply(definir_prioridade_estrita)
+        self.df_opps['prioridade_comercial'] = self.df_opps['qtd_tickets'].apply(definir_prioridade)
 
     # ==========================================
-    # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT DINÂMICO
+    # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL
     # ==========================================
     def generate_sales_script(self):
-        print("--- ETAPAS 5 e 6: Gerando Recomendações e Scripts Customizados ---")
+        print("--- ETAPAS 5 e 6: Gerando Recomendações e Scripts ---")
         if self.df_opps.empty: return
 
         scripts = []
         for _, row in self.df_opps.iterrows():
-            # Script muda o contexto caso identifique que o cliente já usa o ecossistema parceiro (Ex: Fortinet)
-            if "FORTINET" in str(row['servicos_contratados']).upper():
-                contexto_intro = f"Como vocês já utilizam soluções Fortinet conosco corporativamente, nossa engenharia mapeou"
-            else:
-                contexto_intro = f"Mapeamos através do nosso centro de suporte técnico corporativo"
-
             script = f"""
 Cliente (ID): {row['codcli']}
 Problema Recorrente: {row['categoria_problema']} ({row['qtd_tickets']} tickets abertos)
 Serviços Atuais: {row['servicos_contratados']}
 Serviço Sugerido: {row['servico_sugerido']}
-Prioridade: {row['prioridade_comercial']} (Score: {row['score_bruto']})
+Prioridade: {row['prioridade_comercial']}
 
 SCRIPT DE ABORDAGEM:
-"Olá, tudo bem? {contexto_intro} uma recorrência significativa de chamados abertos pela sua equipe técnica relacionados a {row['categoria_problema']}. 
-Visando cessar de vez essas paradas operacionais, gostaríamos de agendar uma breve reunião estratégica de 15 minutos para apresentar o plano focado em {row['motivo_abordagem']}. Conseguimos avaliar isso amanhã à tarde?"
+"Olá, notei que sua equipe tem aberto chamados técnicos relacionados a {row['categoria_problema']}. 
+Como vocês ainda não possuem nosso serviço de {row['servico_sugerido']}, gostaria de agendar uma reunião de 15 minutos para apresentar como essa solução eliminaria esses incidentes. Que tal amanhã à tarde?"
             """
             scripts.append(script.strip())
 
         self.df_opps['script_vendas'] = scripts
 
     # ==========================================
-    # ETAPA 8 - EXPORTAÇÃO COMPACTA
+    # ETAPA 8 - EXPORTAÇÃO
     # ==========================================
     def export_data(self):
-        print("--- ETAPA 8: Exportando Resultados Filtrados ---")
+        print("--- ETAPA 8: Exportando Resultados ---")
         os.makedirs(self.output_dir, exist_ok=True)
 
         if not self.df_opps.empty:
@@ -223,9 +194,9 @@ Visando cessar de vez essas paradas operacionais, gostaríamos de agendar uma br
             with open(os.path.join(self.output_dir, "scripts_comerciais.txt"), "w", encoding="utf-8") as f:
                 for script in self.df_opps['script_vendas']:
                     f.write(script + "\n" + "-"*80 + "\n\n")
-            print(f"Filtro aplicado com sucesso! {self.df_opps.shape[0]} oportunidades qualificadas salvas em: {self.output_dir}")
+            print(f"Arquivos exportados com sucesso na pasta: {self.output_dir}")
         else:
-            print("Não houve dados qualificados para exportar dentro deste patamar crítico.")
+            print("Não houve dados para exportar.")
 
     def run(self):
         self.load_and_profile_data()
@@ -236,10 +207,13 @@ Visando cessar de vez essas paradas operacionais, gostaríamos de agendar uma br
         self.export_data()
 
 if __name__ == "__main__":
-    # Garante o direcionamento correto de pastas na raiz do repositório
+    # Caminho do script atual
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    
+    # Sobe um nível para a raiz do projeto (C:\Users\Cliente\Documents\GitHub\DASHBOARD)
     BASE_DIR = os.path.dirname(SCRIPT_DIR)
 
+    # Agora os caminhos vão apontar corretamente para a raiz do projeto
     caminho_tickets = os.path.join(BASE_DIR, "data", "raw", "Result_28.xlsx")
     caminho_clientes = os.path.join(BASE_DIR, "data", "raw", "Clientes CTI.xlsx")
     caminho_output = os.path.join(BASE_DIR, "output")
@@ -252,4 +226,5 @@ if __name__ == "__main__":
         clients_path=caminho_clientes,
         output_dir=caminho_output
     )
+    # Executa o processo completo
     pipeline.run()
