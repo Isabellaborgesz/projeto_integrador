@@ -65,7 +65,7 @@ LOGIN_HTML = """
 </html>
 """
 
-# --- TEMPLATE HTML DO DASHBOARD COMPLETADO E MELHORADO ---
+# --- TEMPLATE HTML DO DASHBOARD ---
 DASHBOARD_HTML = """
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -105,7 +105,7 @@ DASHBOARD_HTML = """
                             Painel Comercial
                         </button>
                         <button onclick="switchTab('novo-modulo')" id="btn-novo-modulo" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200">
-                            Kanban 
+                            Novo Módulo
                         </button>
                     </nav>
                 </div>
@@ -135,22 +135,22 @@ DASHBOARD_HTML = """
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
                     <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Oportunidades Filtradas</p>
-                    <p class="text-3xl font-bold text-white tracking-tight mt-2">{{KPI_TOTAL}}</p>
+                    <p class="text-3xl font-bold text-white tracking-tight mt-2">"{{KPI_TOTAL}}"</p>
                 </div>
                 <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
                     <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Prioridade Máxima (Hot)</p>
                     <div class="flex justify-between items-baseline mt-2">
-                        <p class="text-3xl font-bold text-rose-500 tracking-tight">{{KPI_ALTA}}</p>
+                        <p class="text-3xl font-bold text-rose-500 tracking-tight">"{{KPI_ALTA}}"</p>
                         <span class="text-[10px] font-bold bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/20">Ação Comercial</span>
                     </div>
                 </div>
                 <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
                     <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Histórico Analisado</p>
-                    <p class="text-3xl font-bold text-slate-300 tracking-tight mt-2">{{KPI_TICKETS}}</p>
+                    <p class="text-3xl font-bold text-slate-300 tracking-tight mt-2">"{{KPI_TICKETS}}"</p>
                 </div>
                 <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
                     <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Maior Demanda Comercial</p>
-                    <p class="text-base font-bold text-blue-400 mt-3 truncate tracking-tight">{{KPI_TOP}}</p>
+                    <p class="text-base font-bold text-blue-400 mt-3 truncate tracking-tight">"{{KPI_TOP}}"</p>
                 </div>
             </div>
 
@@ -160,14 +160,14 @@ DASHBOARD_HTML = """
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Frequência por Categoria do Problema</h3>
                         <p class="text-xs text-slate-500 mt-0.5">Distribuição baseada no diagnóstico NLP dos chamados</p>
                     </div>
-                    <div class="w-full flex-grow">{{GRAFICO_1}}</div>
+                    <div class="w-full flex-grow">"{{GRAFICO_1}}"</div>
                 </div>
                 <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl flex flex-col">
                     <div class="mb-4">
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Distribuição por Score de Urgência</h3>
                         <p class="text-xs text-slate-500 mt-0.5">Fatias geradas a partir da fórmula de multiplicação peso x volumetria</p>
                     </div>
-                    <div class="w-full flex-grow">{{GRAFICO_2}}</div>
+                    <div class="w-full flex-grow">"{{GRAFICO_2}}"</div>
                 </div>
             </div>
 
@@ -210,7 +210,7 @@ DASHBOARD_HTML = """
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-900 text-xs text-slate-300 bg-slate-950/10">
-                                {{TABLE_ROWS}}
+                                "{{TABLE_ROWS}}"
                             </tbody>
                         </table>
                     </div>
@@ -225,7 +225,7 @@ DASHBOARD_HTML = """
                         
                         <div id="scriptPlaceholder" class="bg-slate-950/50 border border-slate-900/80 rounded-xl p-5 text-center py-24 text-slate-600 border-dashed flex flex-col justify-center items-center h-[380px]">
                             <svg class="w-8 h-8 mx-auto mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                            <p class="text-xs font-medium px-4">Selecione qualquer cliente na tabela ao lado ou clique em um Card no Kanban para extrair o script pronto de vendas.</p>
+                            <p class="text-xs font-medium px-4">Selecione qualquer cliente na tabela ao lado para extrair o script pronto de vendas da IA.</p>
                         </div>
                         
                         <div id="scriptContentBox" class="hidden space-y-4">
@@ -254,7 +254,7 @@ DASHBOARD_HTML = """
         <main id="tab-content-novo-modulo" class="hidden flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
                 <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Painel de Chamados & Negócios (Kanban)</h1>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Painel de Chamados & Negócios</h1>
                     <p class="text-sm text-slate-400 mt-1">Gerencie a evolução das propostas comerciais arrastando os cards através das etapas do funil.</p>
                 </div>
             </div>
@@ -277,7 +277,7 @@ DASHBOARD_HTML = """
                     </div>
 
                     <div id="col-afazer" data-status="afazer" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[440px] pb-6">
-                        {{KANBAN_AFAZER}}
+                        "{{KANBAN_AFAZER}}"
                     </div>
                 </div>
 
@@ -287,7 +287,7 @@ DASHBOARD_HTML = """
                         <span class="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-aguardando">0</span>
                     </div>
                     <div id="col-aguardando" data-status="aguardando" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
-                        {{KANBAN_AGUARDANDO}}
+                        "{{KANBAN_AGUARDANDO}}"
                     </div>
                 </div>
 
@@ -297,7 +297,7 @@ DASHBOARD_HTML = """
                         <span class="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-recusado">0</span>
                     </div>
                     <div id="col-recusado" data-status="recusado" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
-                        {{KANBAN_RECUSADO}}
+                        "{{KANBAN_RECUSADO}}"
                     </div>
                 </div>
 
@@ -307,7 +307,7 @@ DASHBOARD_HTML = """
                         <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-aceito">0</span>
                     </div>
                     <div id="col-aceito" data-status="aceito" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
-                        {{KANBAN_ACEITO}}
+                        "{{KANBAN_ACEITO}}"
                     </div>
                 </div>
             </div>
@@ -335,6 +335,7 @@ DASHBOARD_HTML = """
             }
         }
 
+        // Filtro da Tabela Principal
         function filterTable() {
             const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
             const filterVal = document.getElementById('priorityFilter').value;
@@ -353,12 +354,14 @@ DASHBOARD_HTML = """
             });
         }
 
+        // FILTRO CIRÚRGICO DA COLUNA "A FAZER PROPOSTA"
         function filterKanbanAFazer() {
             const searchVal = document.getElementById('kanbanSearchInput').value.toLowerCase().trim();
             const cards = document.querySelectorAll('#col-afazer > div');
             
             cards.forEach(card => {
                 const id = card.getAttribute('data-id').toLowerCase();
+                // Também pesquisa opcionalmente pelo segmento guardado no texto interno do card
                 const innerText = card.textContent.toLowerCase();
                 
                 if (id.includes(searchVal) || innerText.includes(searchVal)) {
@@ -367,19 +370,6 @@ DASHBOARD_HTML = """
                     card.style.display = 'none';
                 }
             });
-        }
-
-        // Função Unificada que preenche o Playbook de qualquer origem
-        function preencherPlaybook(id, segmento, cat, sug, rawScript) {
-            document.getElementById('scriptPlaceholder').className = "hidden";
-            document.getElementById('scriptContentBox').classList.remove('hidden');
-            document.getElementById('copyAlert').classList.add('hidden');
-
-            document.getElementById('viewId').textContent = "Lead #" + id;
-            document.getElementById('viewSegm').textContent = segmento;
-            document.getElementById('viewCat').textContent = cat;
-            document.getElementById('viewSug').textContent = sug;
-            document.getElementById('scriptBodyText').value = rawScript;
         }
 
         function loadLeadScript(row) {
@@ -392,33 +382,15 @@ DASHBOARD_HTML = """
             const sug = row.getAttribute('data-sug');
             const rawScript = row.querySelector('.hidden-script-source').textContent;
 
-            preencherPlaybook(id, segmento, cat, sug, rawScript);
-        }
+            document.getElementById('scriptPlaceholder').classList.add('hidden');
+            document.getElementById('scriptContentBox').classList.remove('hidden');
+            document.getElementById('copyAlert').classList.add('hidden');
 
-        // Função engatada ao clicar no Card do Kanban
-        function abrirPlaybookDeCard(id, segmento, cat, sug, encodedScriptId) {
-            const rawScript = document.getElementById(encodedScriptId).textContent;
-            switchTab('comercial');
-            preencherPlaybook(id, segmento, cat, sug, rawScript);
-            
-            // Highlight opcional na tabela se a linha existir ali
-            const targetRow = document.querySelector(`#leadsTable tbody tr[data-id="${id}"]`);
-            if(targetRow) {
-                document.querySelectorAll('#leadsTable tbody tr').forEach(r => r.classList.remove('bg-blue-600/10', 'border-l-2', 'border-blue-500'));
-                targetRow.classList.add('bg-blue-600/10', 'border-l-2', 'border-blue-500');
-                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-
-        // Função de expansão da gaveta interna do card
-        function toggleGaveta(event, idGaveta) {
-            event.stopPropagation(); // Impede o clique de disparar a abertura do playbook
-            const gaveta = document.getElementById(idGaveta);
-            if (gaveta.classList.contains('hidden')) {
-                gaveta.classList.remove('hidden');
-            } else {
-                gaveta.classList.add('hidden');
-            }
+            document.getElementById('viewId').textContent = "Lead #" + id;
+            document.getElementById('viewSegm').textContent = segmento;
+            document.getElementById('viewCat').textContent = cat;
+            document.getElementById('viewSug').textContent = sug;
+            document.getElementById('scriptBodyText').value = rawScript;
         }
 
         function copyToClipboard() {
@@ -474,12 +446,6 @@ DASHBOARD_HTML = """
 def index():
     return LOGIN_HTML
 
-@app.post("/api/kanban/save")
-def save_kanban(data: KanbanUpdate):
-    global KANBAN_STATE
-    KANBAN_STATE[data.codcli] = data.nova_coluna
-    return {"status": "success", "codcli": data.codcli, "coluna": data.nova_coluna}
-
 @app.post("/login", response_class=HTMLResponse)
 def login(username: str = Form(...), password: str = Form(...)):
     global KANBAN_STATE
@@ -497,7 +463,7 @@ def login(username: str = Form(...), password: str = Form(...)):
         df = pd.read_csv(caminho_csv)
         
     if df is None or df.empty:
-        return "<h1 style='font-family:sans-serif; text-align:center; color:white; margin-top:50px;'>Erro: O arquivo consolidado não foi localizado na pasta 'output'.</h1>"
+        return "<h1 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Erro: O arquivo consolidado não foi localizado na pasta 'output'.</h1>"
         
     kpi_total = str(len(df))
     kpi_alta = str(len(df[df['prioridade_comercial'] == 'ALTA']))
@@ -522,88 +488,75 @@ def login(username: str = Form(...), password: str = Form(...)):
     )
     html_g2 = pio.to_html(fig_prio, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # Garantir que todo cliente do DF possua uma coluna no Kanban carregada na memória
     for _, row in df.iterrows():
         cid = str(row['codcli'])
         if cid not in KANBAN_STATE:
             KANBAN_STATE[cid] = "afazer"
 
-    # --- MONTAGEM DA TABELA ---
     table_rows = ""
+    kanban_buffers = {"afazer": "", "aguardando": "", "recusado": "", "aceito": ""}
+    
     for _, row in df.iterrows():
-        color_badge = "text-rose-400 bg-rose-500/10 border-rose-500/20" if row['prioridade_comercial'] == 'ALTA' else ("text-blue-400 bg-blue-500/10 border-blue-500/20" if row['prioridade_comercial'] == 'MÉDIA' else "text-slate-400 bg-slate-500/10 border-slate-500/20")
+        cid = str(row['codcli'])
+        prio = row['prioridade_comercial']
+        segmento_txt = str(row['segmento']) if 'segmento' in df.columns and pd.notna(row['segmento']) else "Não Informado"
+        
+        badge_style = "bg-rose-500/10 text-rose-400 border border-rose-500/20" if prio == 'ALTA' else "bg-blue-500/10 text-blue-400 border border-blue-500/20" if prio == 'MÉDIA' else "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+        dot_color = "bg-rose-500" if prio == 'ALTA' else "bg-blue-500" if prio == 'MÉDIA' else "bg-slate-500"
+        
         table_rows += f"""
-        <tr data-id="{row['codcli']}" data-segmento="{row['segmento']}" data-priority="{row['prioridade_comercial']}" data-cat="{row['categoria_problema']}" data-sug="{row['servico_sugerido']}" onclick="loadLeadScript(this)" class="border-b border-slate-900/60 hover:bg-slate-900/20 cursor-pointer transition">
-            <td class="px-5 py-3 font-semibold text-white">#{row['codcli']}</td>
-            <td class="px-5 py-3 text-slate-400 font-medium">{row['segmento']}</td>
-            <td class="px-5 py-3 text-blue-400 font-semibold">{row['categoria_problema']}</td>
-            <td class="px-5 py-3 text-emerald-400 font-medium">{row['servico_sugerido']}</td>
-            <td class="px-5 py-3 text-right">
-                <span class="text-[10px] font-bold border px-2 py-0.5 rounded-full {color_badge}">{row['prioridade_comercial']} ({row['score_bruto']})</span>
-                <span class="hidden hidden-script-source">{row['script_vendas']}</span>
+        <tr class="hover:bg-slate-900/40 cursor-pointer transition border-b border-slate-900" 
+            data-priority="{prio}" data-id="{cid}" data-segmento="{segmento_txt}" data-cat="{row['categoria_problema']}" data-sug="{row['servico_sugerido']}"
+            onclick="loadLeadScript(this)">
+            <td class="px-5 py-3.5 font-bold text-white tracking-tight">{cid}</td>
+            <td class="px-5 py-3.5 text-yellow-500 font-medium">{segmento_txt}</td>
+            <td class="px-5 py-3.5 text-slate-400">{row['categoria_problema']}</td>
+            <td class="px-5 py-3.5 text-slate-200 font-medium">{row['servico_sugerido']}</td>
+            <td class="px-5 py-3.5 text-right">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md {badge_style}">
+                    <span class="w-1.5 h-1.5 rounded-full {dot_color}"></span>
+                    {prio}
+                </span>
+                <div class="hidden hidden-script-source">{row['script_vendas']}</div>
             </td>
         </tr>
         """
-
-    # --- REQUISITO: MONTAGEM DOS BUFFERS DO KANBAN ORDENADOS POR SCORE DECRESCENTE ---
-    kanban_buffers = {"afazer": "", "aguardando": "", "recusado": "", "aceito": ""}
-    
-    # Ordenar o dataframe temporariamente de forma decrescente para preencher as colunas de cima para baixo
-    df_ordenado_kanban = df.sort_values(by="score_bruto", ascending=False)
-    
-    for _, row in df_ordenado_kanban.iterrows():
-        cid = str(row['codcli'])
-        status_atual = KANBAN_STATE.get(cid, "afazer")
         
-        # Borda de prioridade do Card
-        cor_borda = "border-l-rose-500" if row['prioridade_comercial'] == 'ALTA' else ("border-l-blue-500" if row['prioridade_comercial'] == 'MÉDIA' else "border-l-slate-600")
-        
-        # Criação do Card dinâmico em conformidade com as regras de negócio solicitadas
         card_html = f"""
-        <div data-id="{cid}" onclick="abrirPlaybookDeCard('{cid}', '{row['segmento']}', '{row['categoria_problema']}', '{row['servico_sugerido']}', 'script-storage-{cid}')" class="bg-slate-950 border border-slate-900 border-l-4 {cor_borda} p-3.5 rounded-xl space-y-2 cursor-pointer hover:border-slate-800 transition shadow-sm group">
+        <div data-id="{cid}" class="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-xl shadow-md cursor-grab active:cursor-grabbing transition space-y-2">
             <div class="flex justify-between items-center">
-                <span class="text-xs font-bold text-white">ID: {cid}</span>
-                <span class="text-[10px] font-extrabold bg-slate-900 px-2 py-0.5 rounded text-slate-300 border border-slate-800">★ {row['score_bruto']}</span>
+                <span class="text-xs font-bold text-white">Cliente #{cid}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded {badge_style}">{prio}</span>
             </div>
-            <div class="text-[11px] text-slate-400 leading-tight">
-                <span class="text-slate-600 font-medium block">Serviço Contratado:</span>
-                <span class="text-slate-300 font-semibold truncate block">{row['servicos_contratados']}</span>
+            <p class="text-[11px] text-yellow-500 font-medium tracking-tight">🏢 Segmento: {segmento_txt}</p>
+            <div class="border-t border-slate-900 pt-2">
+                <p class="text-[10px] text-slate-500 uppercase font-semibold">Solução Alvo:</p>
+                <p class="text-xs text-slate-200 font-medium truncate">{row['servico_sugerido']}</p>
             </div>
-            
-            <div class="text-right pt-1">
-                <button onclick="toggleGaveta(event, 'gaveta-{cid}')" class="text-[10px] text-blue-500 hover:text-blue-400 font-semibold focus:outline-none">
-                    ⚙ Ver mais detalhes
-                </button>
-            </div>
-            
-            <div id="gaveta-{cid}" class="hidden text-[10px] text-slate-500 border-t border-slate-900 pt-2 mt-1 space-y-1">
-                <p><b class="text-slate-400">Segmento:</b> {row['segmento']}</p>
-                <p><b class="text-slate-400">Problema Mapeado:</b> {row['qtd_tickets']} chamados de {row['categoria_problema']}</p>
-                <p><b class="text-slate-400">Oferta Recomendada:</b> {row['servico_sugerido']}</p>
-            </div>
-            
-            <span id="script-storage-{cid}" class="hidden">{row['script_vendas']}</span>
         </div>
         """
-        
-        if status_atual in kanban_buffers:
-            kanban_buffers[status_atual] += card_html
+        status_do_lead = KANBAN_STATE.get(cid, "afazer")
+        kanban_buffers[status_do_lead] += card_html
 
-    # Injeção limpa de dados nas variáveis do Template
-    html_final = DASHBOARD_HTML.replace("{{KPI_TOTAL}}", kpi_total)\
-                               .replace("{{KPI_ALTA}}", kpi_alta)\
-                               .replace("{{KPI_TICKETS}}", kpi_tickets)\
-                               .replace("{{KPI_TOP}}", kpi_top)\
-                               .replace("{{GRAFICO_1}}", html_g1)\
-                               .replace("{{GRAFICO_2}}", html_g2)\
-                               .replace("{{TABLE_ROWS}}", table_rows)\
-                               .replace("{{KANBAN_AFAZER}}", kanban_buffers["afazer"])\
-                               .replace("{{KANBAN_AGUARDANDO}}", kanban_buffers["aguardando"])\
-                               .replace("{{KANBAN_RECUSADO}}", kanban_buffers["recusado"])\
-                               .replace("{{KANBAN_ACEITO}}", kanban_buffers["aceito"])
+    page = DASHBOARD_HTML
+    page = page.replace('""{{KPI_TOTAL}}""', kpi_total).replace('"{{KPI_TOTAL}}"', kpi_total)
+    page = page.replace('""{{KPI_ALTA}}""', kpi_alta).replace('"{{KPI_ALTA}}"', kpi_alta)
+    page = page.replace('""{{KPI_TICKETS}}""', kpi_tickets).replace('"{{KPI_TICKETS}}"', kpi_tickets)
+    page = page.replace('""{{KPI_TOP}}""', kpi_top).replace('"{{KPI_TOP}}"', kpi_top)
+    page = page.replace('""{{GRAFICO_1}}""', html_g1).replace('"{{GRAFICO_1}}"', html_g1)
+    page = page.replace('""{{GRAFICO_2}}""', html_g2).replace('"{{GRAFICO_2}}"', html_g2)
+    page = page.replace('""{{TABLE_ROWS}}""', table_rows).replace('"{{TABLE_ROWS}}"', table_rows)
+    
+    page = page.replace('""{{KANBAN_AFAZER}}""', kanban_buffers["afazer"]).replace('"{{KANBAN_AFAZER}}"', kanban_buffers["afazer"])
+    page = page.replace('""{{KANBAN_AGUARDANDO}}""', kanban_buffers["aguardando"]).replace('"{{KANBAN_AGUARDANDO}}"', kanban_buffers["aguardando"])
+    page = page.replace('""{{KANBAN_RECUSADO}}""', kanban_buffers["recusado"]).replace('"{{KANBAN_RECUSADO}}"', kanban_buffers["recusado"])
+    page = page.replace('""{{KANBAN_ACEITO}}""', kanban_buffers["aceito"]).replace('"{{KANBAN_ACEITO}}"', kanban_buffers["aceito"])
 
-    return html_final
+    return page
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+@app.post("/api/kanban/save")
+def save_kanban_position(data: KanbanUpdate):
+    if data.nova_coluna not in ["afazer", "aguardando", "recusado", "aceito"]:
+        raise HTTPException(status_code=400, detail="Etapa do funil inválida")
+    KANBAN_STATE[data.codcli] = data.nova_coluna
+    return JSONResponse(content={"status": "success"})
