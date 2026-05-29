@@ -69,10 +69,11 @@ DASHBOARD_HTML = """
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
+        /* Scrollbars customizadas e discretas para o modo dark */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
     </style>
 </head>
 <body class="bg-slate-950 min-h-screen text-slate-100 antialiased font-sans">
@@ -87,7 +88,7 @@ DASHBOARD_HTML = """
                     </div>
                     <div>
                         <span class="text-sm font-bold tracking-tight text-white">Motor de Vendas B2B</span>
-                        <span class="hidden sm:inline-block ml-2 text-xs font-semibold bg-slate-900 px-2 py-0.5 rounded text-slate-400 border border-slate-800">v2.1</span>
+                        <span class="hidden sm:inline-block ml-2 text-xs font-semibold bg-slate-900 px-2 py-0.5 rounded text-slate-400 border border-slate-800">v2.2</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
@@ -153,11 +154,11 @@ DASHBOARD_HTML = """
 
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
                 
-                <div class="xl:col-span-2 bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-xl">
+                <div class="xl:col-span-2 bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-xl flex flex-col">
                     <div class="p-5 border-b border-slate-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/20">
                         <div>
                             <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Painel de Leads Qualificados</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">Selecione uma linha para ler o script comercial sob medida ao lado</p>
+                            <p class="text-xs text-slate-500 mt-0.5">Selecione uma linha para carregar o playbook ao lado</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <select id="priorityFilter" onchange="filterTable()" class="border border-slate-800 rounded-lg px-3 py-2 bg-slate-950 text-xs font-semibold focus:outline-none focus:border-blue-500 text-slate-300 transition">
@@ -168,9 +169,10 @@ DASHBOARD_HTML = """
                             </select>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-900 text-left" id="leadsTable">
-                            <thead class="bg-slate-950/40 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                    
+                    <div class="overflow-y-auto max-h-[465px] relative">
+                        <table class="min-w-full divide-y divide-slate-900 text-left sticky" id="leadsTable">
+                            <thead class="bg-slate-950/80 text-[11px] font-bold tracking-wider text-slate-500 uppercase sticky top-0 backdrop-blur-md z-10 border-b border-slate-900">
                                 <tr>
                                     <th class="px-5 py-3.5">Cód. Cliente</th>
                                     <th class="px-5 py-3.5">Sintoma Técnico</th>
@@ -186,32 +188,35 @@ DASHBOARD_HTML = """
                     </div>
                 </div>
 
-                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-xl space-y-4 sticky top-24">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Playbook Comercial</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Geração de abordagem automatizada baseada no gap do cliente</p>
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-xl space-y-4 min-h-[538px] flex flex-col justify-between">
+                    <div class="space-y-4 flex-grow">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Playbook Comercial</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Geração de abordagem automatizada baseada no gap do cliente</p>
+                        </div>
+                        
+                        <div id="scriptPlaceholder" class="bg-slate-950/50 border border-slate-900/80 rounded-xl p-5 text-center py-24 text-slate-600 border-dashed flex flex-col justify-center items-center h-[380px]">
+                            <svg class="w-8 h-8 mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                            <p class="text-xs font-medium px-4">Selecione qualquer cliente na tabela ao lado para extrair o script pronto de vendas da IA.</p>
+                        </div>
+                        
+                        <div id="scriptContentBox" class="hidden space-y-4">
+                            <div class="p-4 bg-slate-950 border border-slate-900 rounded-xl space-y-2 text-xs">
+                                <div class="flex justify-between"><span class="text-slate-500">Alvo Comercial:</span> <span id="viewId" class="font-bold text-white"></span></div>
+                                <div class="flex justify-between"><span class="text-slate-500">Histórico de Dor:</span> <span id="viewCat" class="font-semibold text-blue-400"></span></div>
+                                <div class="flex justify-between"><span class="text-slate-500">Oferta Recomendada:</span> <span id="viewSug" class="font-bold text-emerald-400"></span></div>
+                            </div>
+                            <div class="relative group">
+                                <textarea id="scriptBodyText" readonly class="w-full h-[225px] p-3.5 bg-slate-950 border border-slate-900 rounded-xl text-xs font-mono text-slate-300 focus:outline-none resize-none leading-relaxed"></textarea>
+                                <button onclick="copyToClipboard()" class="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] transition shadow-md">
+                                    Copiar Texto
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div id="scriptPlaceholder" class="bg-slate-950/50 border border-slate-900/80 rounded-xl p-5 text-center py-12 text-slate-600 border-dashed">
-                        <svg class="w-8 h-8 mx-auto mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                        <p class="text-xs font-medium">Selecione qualquer cliente na tabela ao lado para extrair o script pronto de vendas da IA.</p>
-                    </div>
-                    
-                    <div id="scriptContentBox" class="hidden space-y-4">
-                        <div class="p-4 bg-slate-950 border border-slate-900 rounded-xl space-y-2 text-xs">
-                            <div class="flex justify-between"><span class="text-slate-500">Alvo Comercial:</span> <span id="viewId" class="font-bold text-white"></span></div>
-                            <div class="flex justify-between"><span class="text-slate-500">Histórico de Dor:</span> <span id="viewCat" class="font-semibold text-blue-400"></span></div>
-                            <div class="flex justify-between"><span class="text-slate-500">Oferta Recomendada:</span> <span id="viewSug" class="font-bold text-emerald-400"></span></div>
-                        </div>
-                        <div class="relative group">
-                            <textarea id="scriptBodyText" readonly class="w-full h-44 p-3.5 bg-slate-950 border border-slate-900 rounded-xl text-xs font-mono text-slate-300 focus:outline-none resize-none leading-relaxed"></textarea>
-                            <button onclick="copyToClipboard()" class="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] transition shadow-md">
-                                Copiar Texto
-                            </button>
-                        </div>
-                        <div id="copyAlert" class="hidden text-center text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-1.5 rounded-lg">
-                            ✓ Copiado para a área de transferência!
-                        </div>
+                    <div id="copyAlert" class="hidden text-center text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-2 rounded-lg mt-2">
+                        ✓ Copiado para a área de transferência!
                     </div>
                 </div>
             </div>
@@ -230,19 +235,14 @@ DASHBOARD_HTML = """
         }
 
         function loadLeadScript(row) {
-            // Remove active style from any other row
             document.querySelectorAll('#leadsTable tbody tr').forEach(r => r.classList.remove('bg-blue-600/10', 'border-l-2', 'border-blue-500'));
-            
-            // Add active visual treatment to selected row
             row.classList.add('bg-blue-600/10', 'border-l-2', 'border-blue-500');
 
-            // Extraction of analytical attributes
             const id = row.getAttribute('data-id');
             const cat = row.getAttribute('data-cat');
             const sug = row.getAttribute('data-sug');
             const rawScript = row.querySelector('.hidden-script-source').textContent;
 
-            // Interface Mutation Control
             document.getElementById('scriptPlaceholder').classList.add('hidden');
             document.getElementById('scriptContentBox').classList.remove('hidden');
             document.getElementById('copyAlert').classList.add('hidden');
@@ -295,7 +295,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     kpi_tickets = str(df['qtd_tickets'].sum())
     kpi_top = str(df['servico_sugerido'].mode()[0]) if not df.empty else "N/A"
 
-    # --- GRAFICO 1: Modo Dark Premium ---
+    # --- GRAFICO 1 ---
     fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), 
                      x='categoria_problema', y='count')
     fig_cat.update_traces(marker_color='#2563eb', marker_line_color='#1e40af', marker_line_width=1, opacity=0.85)
@@ -307,7 +307,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     )
     html_g1 = pio.to_html(fig_cat, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # --- GRAFICO 2: Rosca Dark Premium ---
+    # --- GRAFICO 2 ---
     fig_prio = px.pie(df, names='prioridade_comercial', hole=0.7,
                       color='prioridade_comercial',
                       color_discrete_map={'ALTA':'#f43f5e', 'MÉDIA':'#3b82f6', 'BAIXA':'#64748b'})
@@ -320,7 +320,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     )
     html_g2 = pio.to_html(fig_prio, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # --- LINHAS DA TABELA INTERATIVA COM INJEÇÃO DE SCRIPT REVERSO ---
+    # --- LINHAS DA TABELA INTERATIVA ---
     table_rows = ""
     for _, row in df.iterrows():
         prio = row['prioridade_comercial']
