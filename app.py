@@ -178,7 +178,17 @@ DASHBOARD_HTML = """
                             <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Painel de Leads Qualificados</h3>
                             <p class="text-xs text-slate-500 mt-0.5">Selecione uma linha para carregar o playbook ao lado</p>
                         </div>
-                        <div class="flex items-center gap-2">
+                        
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </span>
+                                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar ID ou Segmento..." class="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-semibold text-slate-300 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition">
+                            </div>
+                            
                             <select id="priorityFilter" onchange="filterTable()" class="border border-slate-800 rounded-lg px-3 py-2 bg-slate-950 text-xs font-semibold focus:outline-none focus:border-blue-500 text-slate-300 transition">
                                 <option value="TODOS">Todos os Níveis</option>
                                 <option value="ALTA">🚨 Apenas ALTA</option>
@@ -250,7 +260,6 @@ DASHBOARD_HTML = """
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start min-h-[550px]">
-                
                 <div class="bg-slate-900/40 border border-slate-900 rounded-xl p-4 flex flex-col h-full min-h-[500px]">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400">📋 A Fazer Proposta</h3>
@@ -290,7 +299,6 @@ DASHBOARD_HTML = """
                         "{{KANBAN_ACEITO}}"
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
@@ -316,13 +324,27 @@ DASHBOARD_HTML = """
             }
         }
 
+        // --- LÓGICA DE FILTRAGEM UNIFICADA (PESQUISA + PRIORIDADE) ---
         function filterTable() {
-            const val = document.getElementById('priorityFilter').value;
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+            const filterVal = document.getElementById('priorityFilter').value;
             const rows = document.querySelectorAll('#leadsTable tbody tr');
+            
             rows.forEach(row => {
+                const id = row.getAttribute('data-id').toLowerCase();
+                const segmento = row.getAttribute('data-segmento').toLowerCase();
                 const priority = row.getAttribute('data-priority');
-                if(val === 'TODOS' || priority === val) { row.style.display = ''; } 
-                else { row.style.display = 'none'; }
+                
+                // Verifica o termo da busca (no ID ou no Segmento)
+                const matchesSearch = id.includes(searchVal) || segmento.includes(searchVal);
+                // Verifica a prioridade selecionada
+                const matchesPriority = (filterVal === 'TODOS' || priority === filterVal);
+                
+                if (matchesSearch && matchesPriority) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
             });
         }
 
@@ -442,7 +464,6 @@ def login(username: str = Form(...), password: str = Form(...)):
     )
     html_g2 = pio.to_html(fig_prio, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # Inicializa todos os clientes do Painel no estado padrão "A Fazer" caso estejam entrando pela primeira vez
     for _, row in df.iterrows():
         cid = str(row['codcli'])
         if cid not in KANBAN_STATE:
@@ -459,7 +480,6 @@ def login(username: str = Form(...), password: str = Form(...)):
         badge_style = "bg-rose-500/10 text-rose-400 border border-rose-500/20" if prio == 'ALTA' else "bg-blue-500/10 text-blue-400 border border-blue-500/20" if prio == 'MÉDIA' else "bg-slate-500/10 text-slate-400 border border-slate-500/20"
         dot_color = "bg-rose-500" if prio == 'ALTA' else "bg-blue-500" if prio == 'MÉDIA' else "bg-slate-500"
         
-        # Renderização das Linhas da Tabela (Idêntica)
         table_rows += f"""
         <tr class="hover:bg-slate-900/40 cursor-pointer transition border-b border-slate-900" 
             data-priority="{prio}" data-id="{cid}" data-segmento="{segmento_txt}" data-cat="{row['categoria_problema']}" data-sug="{row['servico_sugerido']}"
@@ -478,7 +498,6 @@ def login(username: str = Form(...), password: str = Form(...)):
         </tr>
         """
         
-        # Estrutura visual limpa e combinando perfeitamente com os cartões para as colunas do Kanban
         card_html = f"""
         <div data-id="{cid}" class="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-xl shadow-md cursor-grab active:cursor-grabbing transition space-y-2">
             <div class="flex justify-between items-center">
@@ -504,7 +523,6 @@ def login(username: str = Form(...), password: str = Form(...)):
     page = page.replace('""{{GRAFICO_2}}""', html_g2).replace('"{{GRAFICO_2}}"', html_g2)
     page = page.replace('""{{TABLE_ROWS}}""', table_rows).replace('"{{TABLE_ROWS}}"', table_rows)
     
-    # Injeção das colunas de cards processadas na aba reservada
     page = page.replace('""{{KANBAN_AFAZER}}""', kanban_buffers["afazer"]).replace('"{{KANBAN_AFAZER}}"', kanban_buffers["afazer"])
     page = page.replace('""{{KANBAN_AGUARDANDO}}""', kanban_buffers["aguardando"]).replace('"{{KANBAN_AGUARDANDO}}"', kanban_buffers["aguardando"])
     page = page.replace('""{{KANBAN_RECUSADO}}""', kanban_buffers["recusado"]).replace('"{{KANBAN_RECUSADO}}"', kanban_buffers["recusado"])
@@ -512,7 +530,6 @@ def login(username: str = Form(...), password: str = Form(...)):
 
     return page
 
-# Endpoint assíncrono para o drag-and-drop salvar a posição na memória do servidor
 @app.post("/api/kanban/save")
 def save_kanban_position(data: KanbanUpdate):
     if data.nova_coluna not in ["afazer", "aguardando", "recusado", "aceito"]:
