@@ -68,36 +68,33 @@ class SalesOpportunityPipeline:
 
         self.df_tickets['categoria_nlp'] = self.df_tickets['texto_limpo'].apply(categorize_text)
 
-    # ==========================================
-    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (LOGICA DE RECOMENDAÇÃO ATUALIZADA)
+   # ==========================================
+    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (FOCO EM SEGMENTO & SCORE)
     # ==========================================
     def model_opportunities(self):
         print("--- ETAPA 3: Inteligência de Cross-Selling por Segmento de Mercado ---")
         
-        # Checar se as colunas essenciais existem
         if 'codcli' not in self.df_clients.columns or 'servico' not in self.df_clients.columns:
             print("Erro: As colunas 'codcli' ou 'servico' não foram encontradas na planilha Clientes.")
             self.df_opps = pd.DataFrame()
             return
             
         if 'segmento' not in self.df_clients.columns:
-            print("Aviso: Coluna 'segmento' não mapeada. Criando segmento genérico para não quebrar a execução.")
             self.df_clients['segmento'] = 'Geral'
 
-        # 1. Mapear o segmento de cada cliente (Garantindo um mapeamento único por codcli)
+        # Mapeamento do segmento por cliente
         mapeamento_segmentos = self.df_clients.groupby('codcli')['segmento'].first().to_dict()
 
-        # 2. Calcular quais os serviços mais contratados por SEGMENTO (Ranking de popularidade)
-        # Conta a quantidade de clientes que possuem cada serviço dentro de cada segmento
+        # Ranking de popularidade de serviços por segmento
         ranking_servicos_segmento = self.df_clients.groupby(['segmento', 'servico']).size().reset_index(name='frequencia')
         ranking_servicos_segmento = ranking_servicos_segmento.sort_values(by=['segmento', 'frequencia'], ascending=[True, False])
 
-        # 3. Concatenar a lista de todos os serviços que o cliente já possui
+        # Serviços que cada cliente já possui
         servicos_por_cliente = self.df_clients.groupby('codcli')['servico'].apply(
             lambda x: list(x.dropna().astype(str).str.upper())
         ).to_dict()
 
-        # 4. Agrupar volume de chamados do suporte técnico por cliente e categoria
+        # Volumetria de chamados por categoria técnica
         if 'codcli' in self.df_tickets.columns:
             recorrencia_tickets = self.df_tickets.groupby(['codcli', 'categoria_nlp']).size().reset_index(name='qtd_tickets')
             tickets_dict = recorrencia_tickets.groupby('codcli').apply(lambda x: dict(zip(x['categoria_nlp'], x['qtd_tickets']))).to_dict()
@@ -106,42 +103,42 @@ class SalesOpportunityPipeline:
 
         oportunidades = []
 
-        # 5. Avaliar oportunidades para cada cliente cadastrado
         for cliente_id in servicos_por_cliente.keys():
             segmento_cliente = mapeamento_segmentos.get(cliente_id, "Geral")
             servicos_atuais = servicos_por_cliente.get(cliente_id, [])
             
-            # Buscar o ranking de serviços que os concorrentes do mesmo segmento compram
+            # Buscar os serviços mais comuns dos concorrentes no mesmo segmento
             servicos_populares_no_segmento = ranking_servicos_segmento[ranking_servicos_segmento['segmento'] == segmento_cliente]
             
-            # Localizar o primeiro serviço mais popular do segmento que este cliente específico AINDA NÃO possui (GAP)
             servico_sugerido = None
             for _, item in servicos_populares_no_segmento.iterrows():
                 servico_analisado = str(item['servico']).upper()
+                
+                # Se o cliente NÃO possui o serviço mais popular do segmento dele, este é o nosso alvo comercial
                 if servico_analisado not in servicos_atuais:
-                    servico_sugerido = item['servico']  # Encontramos o gap comercial ideal!
+                    servico_sugerido = item['servico']
                     break
             
-            # Se o cliente já tem todos os serviços populares do segmento dele, passamos para o próximo
+            # Se o cliente já for completo no segmento, não geramos oportunidade
             if not servico_sugerido:
                 continue
 
-            # Verificar se o cliente possui algum chamado correlacionado na categoria para somar tração de urgência
-            # Mapeia o serviço para a categoria NLP correspondente para pegar o histórico de dores
+            # Mapeamento para buscar a dor técnica (tickets) associada ao serviço sugerido
             categoria_relacionada = "OUTROS"
             servico_sugerido_upper = str(servico_sugerido).upper()
             if "BACKUP" in servico_sugerido_upper: categoria_relacionada = "BACKUP"
-            elif "FIREWALL" in servico_sugerido_upper or "ANTIVIRUS" in servico_sugerido_upper: categoria_relacionada = "SEGURANÇA"
+            elif "FIREWALL" in servico_sugerido_upper or "ANTIVIRUS" in servico_sugerido_upper or "SEGURANÇA" in servico_sugerido_upper: categoria_relacionada = "SEGURANÇA"
             elif "LINK" in servico_sugerido_upper or "DEDICADO" in servico_sugerido_upper or "REDE" in servico_sugerido_upper: categoria_relacionada = "INTERNET/REDE"
-            elif "CLOUD" in servico_sugerido_upper or "SERVIDOR" in servico_sugerido_upper: categoria_relacionada = "HOSPEDAGEM/CLOUD"
+            elif "CLOUD" in servico_sugerido_upper or "SERVIDOR" in servico_sugerido_upper or "HOSPEDAGEM" in servico_sugerido_upper: categoria_relacionada = "HOSPEDAGEM/CLOUD"
 
+            # Resgata a quantidade de chamados abertos nessa categoria específica
             qtd_tickets_dor = tickets_dict.get(cliente_id, {}).get(categoria_relacionada, 0)
 
             oportunidades.append({
                 'codcli': cliente_id,
                 'segmento': segmento_cliente,
                 'categoria_problema': categoria_relacionada,
-                'qtd_tickets': qtd_tickets_dor if qtd_tickets_dor > 0 else 1, # Se não tiver ticket, inicia com 1 para manter tração comercial
+                'qtd_tickets': qtd_tickets_dor if qtd_tickets_dor > 0 else 1, # Mantém 1 para garantir tração se não houver chamados
                 'servicos_contratados': ", ".join(servicos_atuais),
                 'servico_sugerido': servico_sugerido
             })
@@ -149,16 +146,17 @@ class SalesOpportunityPipeline:
         self.df_opps = pd.DataFrame(oportunidades)
 
     # ==========================================
-    # ETAPA 4 - SCORE DE OPORTUNIDADE
+    # ETAPA 4 - SCORE DE OPORTUNIDADE (MANTIDO E AJUSTADO)
     # ==========================================
     def score_opportunities(self):
-        print("--- ETAPA 4: Calculando Score de Lead ---")
+        print("--- ETAPA 4: Calculando Score de Lead por Gravidade de Chamados ---")
         if self.df_opps.empty:
-            print("Nenhuma oportunidade encontrada.")
             return
 
         peso_categoria = {"BACKUP": 3, "SEGURANÇA": 3, "INTERNET/REDE": 2, "HOSPEDAGEM/CLOUD": 2, "OUTROS": 1}
         self.df_opps['peso'] = self.df_opps['categoria_problema'].map(peso_categoria).fillna(1)
+        
+        # O Score bruto multiplica diretamente o volume real de chamados pelo peso da categoria
         self.df_opps['score_bruto'] = self.df_opps['qtd_tickets'] * self.df_opps['peso']
 
         def classificar_score(score):
@@ -169,7 +167,7 @@ class SalesOpportunityPipeline:
         self.df_opps['prioridade_comercial'] = self.df_opps['score_bruto'].apply(classificar_score)
 
     # ==========================================
-    # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL ADAPTADO PARA SEGMENTO
+    # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL UNIFICADO
     # ==========================================
     def generate_sales_script(self):
         print("--- ETAPAS 5 e 6: Gerando Recomendações e Scripts ---")
@@ -182,54 +180,12 @@ Cliente (ID): {row['codcli']}
 Segmento de Mercado: {row['segmento']}
 Serviços Atuais: {row['servicos_contratados']}
 Serviço Sugerido (Gap de Segmento): {row['servico_sugerido']}
-Prioridade: {row['prioridade_comercial']}
+Prioridade: {row['prioridade_comercial']} (Score baseado em {row['qtd_tickets']} chamados de {row['categoria_problema']})
 
-SCRIPT DE ABORDAGEM DE ALTO IMPACTO (BENCHMARKING):
-"Olá! Estava analisando os investimentos em tecnologia das empresas do segmento de {row['segmento']}, que é o mesmo setor de vocês. Notamos que mais de 75% dos seus concorrentes diretos já migraram e utilizam o serviço de {row['servico_sugerido']} para garantir estabilidade operacional e segurança. Como vocês ainda não contam com essa camada ativa no escopo contratual, gostaria de agendar um breve bate-papo de 10 minutos para apresentar o estudo de caso prático desse serviço no seu mercado. Qual o melhor dia para conversarmos?"
-            """
+SCRIPT DE ABORDAGEM DE ALTO IMPACTO (BENCHMARKING + SUPORTE):
+"Olá! Estava analisando os investimentos em tecnologia das empresas do segmento de {row['segmento']}, que é o mesmo setor de vocês. Notamos que mais de 75% dos seus concorrentes diretos utilizam o serviço de {row['servico_sugerido']} para mitigar gargalos operacionais. Como vocês ainda não contam com essa camada ativa no contrato, e considerando que mapeamos algumas instabilidades recentes no seu suporte com temas de {row['categoria_problema']}, gostaria de agendar um breve bate-papo de 10 minutos. Quero te apresentar o estudo de caso prático desse serviço no seu mercado para eliminar esses chamados de vez. Qual o melhor dia?"
+"""
             scripts.append(script.strip())
         
         self.df_opps['script_vendas'] = scripts
-
-    # ==========================================
-    # ETAPA 8 - EXPORTAÇÃO
-    # ==========================================
-    def export_data(self):
-        print("--- ETAPA 8: Exportando Resultados ---")
-        os.makedirs(self.output_dir, exist_ok=True)
-        
-        if not self.df_opps.empty:
-            self.df_opps.to_csv(os.path.join(self.output_dir, "oportunidades.csv"), index=False)
-            self.df_opps.to_excel(os.path.join(self.output_dir, "oportunidades.xlsx"), index=False)
-            
-            with open(os.path.join(self.output_dir, "scripts_comerciais.txt"), "w", encoding="utf-8") as f:
-                for script in self.df_opps['script_vendas']:
-                    f.write(script + "\n" + "-"*80 + "\n\n")
-            print(f"Arquivos exportados com sucesso na pasta: {self.output_dir}")
-        else:
-            print("Não houve dados para exportar.")
-
-    def run(self):
-        self.load_and_profile_data()
-        self.clean_and_categorize()
-        self.model_opportunities()
-        self.score_opportunities()
-        self.generate_sales_script()
-        self.export_data()
-
-if __name__ == "__main__":
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
-    caminho_tickets = os.path.join(BASE_DIR, "data", "raw", "Result_28.xlsx")
-    caminho_clientes = os.path.join(BASE_DIR, "data", "raw", "Clientes CTI.xlsx")
-    caminho_output = os.path.join(BASE_DIR, "output")
-
-    print(f"Buscando tickets em: {caminho_tickets}")
-    print(f"Buscando clientes em: {caminho_clientes}")
-
-    pipeline = SalesOpportunityPipeline(
-        tickets_path=caminho_tickets, 
-        clients_path=caminho_clientes,
-        output_dir=caminho_output
-    )
-    pipeline.run()
+        pipeline.run()
