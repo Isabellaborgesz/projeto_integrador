@@ -64,85 +64,99 @@ class SalesOpportunityPipeline:
 
         self.df_tickets['categoria_nlp'] = self.df_tickets['texto_limpo'].apply(categorize_text)
 
-    # ==========================================
-    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES
+# ==========================================
+    # ETAPA 3 - MODELAGEM SIMPLIFICADA (MATRIZ DE GAPS)
     # ==========================================
     def model_opportunities(self):
-        print("--- ETAPA 3: Cruzamento Tickets x Serviços Contratados ---")
+        print("--- ETAPA 3: Modelagem de Oportunidades Simplificada ---")
+        
+        # 1. Mapear o perfil de consumo de cada cliente (Tabela de 0 e 1)
+        # Cria colunas para cada serviço dizendo se o cliente tem (1) ou não (0)
+        self.df_clients['servico_clean'] = self.df_clients['servico'].astype(str).str.upper()
+        matriz_contratos = pd.crosstab(self.df_clients['codcli'], self.df_clients['servico_clean'])
+        
+        # Garantir que as colunas principais existam na matriz para evitar erros
+        for col in ['BACKUP', 'FIREWALL', 'ANTIVIRUS', 'ACESSO DEDICADO']:
+            if col not in matriz_contratos.columns:
+                matriz_contratos[col] = 0
 
-        if 'codcli' not in self.df_clients.columns or 'codcli' not in self.df_tickets.columns:
-            print("Erro: A coluna 'codcli' (ID do cliente) não foi encontrada nas planilhas.")
-            self.df_opps = pd.DataFrame()
-            return
+        # 2. Consolidar a dor do cliente (Total de tickets por categoria)
+        matriz_dores = pd.crosstab(self.df_tickets['codcli'], self.df_tickets['categoria_nlp'])
 
-        servicos_por_cliente = self.df_clients.groupby('codcli')['servico'].apply(
-            lambda x: ', '.join(x.dropna().astype(str).str.upper())
-        ).reset_index()
-        servicos_por_cliente.rename(columns={'servico': 'servicos_contratados'}, inplace=True)
+        # 3. Unificar as duas matrizes em um único painel de controle
+        painel = pd.merge(matriz_dores, matriz_contratos, on='codcli', how='inner').reset_index()
 
-        recorrencia_tickets = self.df_tickets.groupby(['codcli', 'categoria_nlp']).agg(
-            qtd_tickets=('id_ticket', 'count')
-        ).reset_index()
-
-        df_cruzamento = pd.merge(recorrencia_tickets, servicos_por_cliente, on='codcli', how='left')
-        df_cruzamento['servicos_contratados'] = df_cruzamento['servicos_contratados'].fillna('')
-
-        # Capturar o segmento mapeado se existir na planilha de clientes
+        # 4. Extrair oportunidades usando filtros simples e diretos
+        oportunidades = []
+        
+        # Buscar os segmentos se existirem
         segmentos = {}
         if 'segmento' in self.df_clients.columns:
             segmentos = self.df_clients.set_index('codcli')['segmento'].to_dict()
 
-        oportunidades = []
-        for _, row in df_cruzamento.iterrows():
+        for _, row in painel.iterrows():
             cliente = row['codcli']
-            categoria = row['categoria_nlp']
-            qtd = row['qtd_tickets']
-            servicos = row['servicos_contratados']
+            seg = segmentos.get(cliente, "Não Informado")
+            
+            # FILTRO 1: Reclamou de Backup mas NÃO tem Backup contratado
+            if row.get('BACKUP', 0) > 0 and row.get('BACKUP_y', 0) == 0: # _y ou nome exato se cruzar
+                # Para garantir que pegamos a coluna certa independente do nome:
+                tem_chamado = row.get('BACKUP', 0)
+                tem_contrato = row.get('BACKUP', 0) if 'BACKUP' in matriz_contratos.columns else 0
+                
+            # Vamos usar uma lógica mais limpa e direta aproveitando as variáveis da linha
+            # Cenário A: Dor em BACKUP + Falta de Produto BACKUP
+            if 'BACKUP' in matriz_dores.columns and row['BACKUP'] > 0:
+                # Se não tem a palavra BACKUP nos serviços dele
+                if row.get('BACKUP', 0) > 0 and not any('BACKUP' in str(c) for c in matriz_contratos.columns if row[c] > 0):
+                    oportunidades.append({
+                        'codcli': cliente, 'segmento': seg, 'categoria_problema': 'BACKUP',
+                        'qtd_tickets': row['BACKUP'], 'servico_sugerido': 'Backup Gerenciado'
+                    })
 
-            gap_encontrado = False
-            servico_sugerido = ""
+            # Cenário B: Dor em SEGURANÇA + Falta de Firewall/Antivirus
+            if 'SEGURANÇA' in matriz_dores.columns and row['SEGURANÇA'] > 0:
+                tem_firewall = row.get('FIREWALL', 0) > 0 if 'FIREWALL' in matriz_contratos.columns else False
+                tem_antivirus = row.get('ANTIVIRUS', 0) > 0 if 'ANTIVIRUS' in matriz_contratos.columns else False
+                if not (tem_firewall or tem_antivirus):
+                    oportunidades.append({
+                        'codcli': cliente, 'segmento': seg, 'categoria_problema': 'SEGURANÇA',
+                        'qtd_tickets': row['SEGURANÇA'], 'servico_sugerido': 'Pacote de Cibersegurança / Firewall'
+                    })
 
-            if categoria == "BACKUP" and "BACKUP" not in servicos:
-                gap_encontrado = True
-                servico_sugerido = "Backup Gerenciado"
-            elif categoria == "SEGURANÇA" and ("FIREWALL" not in servicos and "ANTIVIRUS" not in servicos):
-                gap_encontrado = True
-                servico_sugerido = "Pacote de Cibersegurança / Firewall"
-            elif categoria == "INTERNET/REDE" and "ACESSO DEDICADO" not in servicos:
-                gap_encontrado = True
-                servico_sugerido = "Acesso Dedicado Link Corporativo"
+            # Cenário C: Dor em INTERNET/REDE + Falta de Link Dedicado
+            if 'INTERNET/REDE' in matriz_dores.columns and row['INTERNET/REDE'] > 0:
+                tem_link = row.get('ACESSO DEDICADO', 0) > 0 if 'ACESSO DEDICADO' in matriz_contratos.columns else False
+                if not tem_link:
+                    oportunidades.append({
+                        'codcli': cliente, 'segmento': seg, 'categoria_problema': 'INTERNET/REDE',
+                        'qtd_tickets': row['INTERNET/REDE'], 'servico_sugerido': 'Acesso Dedicado Link Corporativo'
+                    })
 
-            if gap_encontrado and qtd >= 1: 
-                oportunidades.append({
-                    'codcli': cliente,
-                    'segmento': segmentos.get(cliente, "Não Informado"),
-                    'categoria_problema': categoria,
-                    'qtd_tickets': qtd,
-                    'servicos_contratados': servicos,
-                    'servico_sugerido': servico_sugerido
-                })
-        
         self.df_opps = pd.DataFrame(oportunidades)
 
     # ==========================================
-    # ETAPA 4 - SCORE DE OPORTUNIDADE
+    # ETAPA 4 - SCORE COMERCIAL SIMPLIFICADO (MÉDIA SIMPLES)
     # ==========================================
     def score_opportunities(self):
-        print("--- ETAPA 4: Calculando Score de Lead ---")
+        print("--- ETAPA 4: Calculando Score Simplificado ---")
         if self.df_opps.empty:
-            print("Nenhuma oportunidade encontrada.")
+            print("Nenhuma oportunidade para pontuar.")
             return
 
-        peso_categoria = {"BACKUP": 3, "SEGURANÇA": 3, "INTERNET/REDE": 2, "HOSPEDAGEM/CLOUD": 1, "OUTROS": 1}
-        self.df_opps['peso'] = self.df_opps['categoria_problema'].map(peso_categoria)
-        self.df_opps['score_bruto'] = self.df_opps['qtd_tickets'] * self.df_opps['peso']
-
-        def classificar_score(score):
-            if score >= 15: return "ALTA"
-            elif score >= 6: return "MÉDIA"
+        # Multiplicação simples: Qtd de chamados determina o tamanho do problema
+        # Se abriu 1 ou 2 chamados = Baixa prioridade (Problema esporádico)
+        # Se abriu de 3 a 5 chamados = Média prioridade (Problema recorrente)
+        # Se abriu mais de 5 chamados = Alta prioridade (Crise / Lead Quente)
+        def definir_prioridade(qtd):
+            if qtd > 5: return "ALTA"
+            elif qtd >= 3: return "MÉDIA"
             else: return "BAIXA"
 
-        self.df_opps['prioridade_comercial'] = self.df_opps['score_bruto'].apply(classificar_score)
+        self.df_opps['prioridade_comercial'] = self.df_opps['qtd_tickets'].apply(definir_prioridade)
+        
+        # Manter compatibilidade com a etapa de script criando as colunas fictícias de apoio
+        self.df_opps['servicos_contratados'] = "Verificado na Matriz"
 
     # ==========================================
     # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL
