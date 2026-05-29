@@ -4,8 +4,6 @@ import pandas as pd
 
 import numpy as np
 
-import spacy
-
 import re
 
 from datetime import datetime
@@ -13,16 +11,6 @@ from datetime import datetime
 
 
 # Carregar modelo NLP em Português do spaCy
-
-try:
-
-    nlp = spacy.load("pt_core_news_sm")
-
-except OSError:
-
-    print("Modelo spaCy não encontrado. Verifique a instalação.")
-
-
 
 class SalesOpportunityPipeline:
 
@@ -204,6 +192,20 @@ class SalesOpportunityPipeline:
 
         self.df_opps = pd.DataFrame(oportunidades)
         print(f"Processamento concluído. Oportunidades ultra qualificadas geradas: {self.df_opps.shape[0]}")
+
+    # ==========================================
+    # ADICIONE ESTE BLOCO AQUI (ETAPA 4):
+    # ==========================================
+    def score_opportunities(self):
+        print("--- ETAPA 4: Calculando Score ---")
+        if self.df_opps.empty: return
+
+        def definir_prioridade(qtd):
+            if qtd >= 5: return "ALTA"
+            elif qtd >= 2: return "MÉDIA"
+            return "BAIXA"
+
+        self.df_opps['prioridade_comercial'] = self.df_opps['qtd_tickets'].apply(definir_prioridade)
     # ==========================================
 
     # ETAPAS 5 E 6 - RECOMENDAÇÃO E SCRIPT COMERCIAL
