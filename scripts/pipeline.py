@@ -150,8 +150,8 @@ class SalesOpportunityPipeline:
 
         # Regra comercial baseada no volume de dor (recorrência de chamados)
         def definir_prioridade(qtd):
-            if qtd >= 5: return "ALTA"
-            elif qtd >= 2: return "MÉDIA"
+            if qtd >= 10: return "ALTA"
+            elif qtd >= 5: return "MÉDIA"
             else: return "BAIXA"
 
         self.df_opps['prioridade_comercial'] = self.df_opps['qtd_tickets'].apply(definir_prioridade)
