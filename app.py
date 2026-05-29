@@ -1,0 +1,415 @@
+from fastapi import FastAPI, Form
+from fastapi.responses import HTMLResponse
+import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+import os
+
+app = FastAPI()
+
+# Credenciais de acesso
+USER_EMAIL = "rodrigo.cti@senai.com"
+USER_PASSWORD = "cti134"
+
+# --- TEMPLATE HTML DA TELA DE LOGIN ---
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar | Motor de Oportunidades B2B</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-slate-950 flex items-center justify-center min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-blue-950 text-slate-100 antialiased">
+    <div class="w-full max-w-md p-4">
+        <div class="bg-slate-900/80 border border-slate-800 backdrop-blur-xl p-8 rounded-2xl shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="mb-8">
+                <div class="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-600/30">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </div>
+                <h2 class="text-2xl font-bold tracking-tight text-white">Acesse a plataforma</h2>
+                <p class="text-sm text-slate-400 mt-1">Insira suas credenciais do ecossistema CTI</p>
+            </div>
+
+            <form action="/login" method="POST" class="space-y-5">
+                <div>
+                    <label class="block text-slate-300 text-xs font-semibold tracking-wider uppercase mb-1.5">E-mail Corporativo</label>
+                    <input type="email" name="username" placeholder="seu.nome@senai.com" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition text-slate-200 placeholder-slate-600">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="block text-slate-300 text-xs font-semibold tracking-wider uppercase">Senha de Acesso</label>
+                    </div>
+                    <input type="password" name="password" placeholder="••••••••" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition text-slate-200 placeholder-slate-600">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-150 text-sm shadow-xl shadow-blue-600/10 mt-2">
+                    Entrar no Painel
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+# --- TEMPLATE HTML DO DASHBOARD ---
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Motor de Oportunidades B2B</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    </style>
+</head>
+<body class="bg-slate-950 min-h-screen text-slate-100 antialiased font-sans">
+    
+    <div class="min-h-screen flex flex-col">
+        
+        <header class="border-b border-slate-900 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-8">
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-600/20">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <div>
+                            <span class="text-sm font-bold tracking-tight text-white">Motor de Vendas B2B</span>
+                        </div>
+                    </div>
+                    
+                    <nav class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-900">
+                        <button onclick="switchTab('comercial')" id="btn-comercial" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm">
+                            Painel Comercial
+                        </button>
+                        <button onclick="switchTab('novo-modulo')" id="btn-novo-modulo" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200">
+                            Novo Módulo
+                        </button>
+                    </nav>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-semibold text-slate-200">Rodrigo</p>
+                        <p class="text-[10px] text-slate-500 font-medium">Ecossistema CTI</p>
+                    </div>
+                    <a href="/" class="border border-slate-800 hover:bg-slate-900/60 text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        Sair
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main id="tab-content-comercial" class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Geração Estratégica de Leads</h1>
+                    <p class="text-sm text-slate-400 mt-1">Cruzamento de chamados de suporte técnico ativos com gaps contratuais comerciais.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Oportunidades Filtradas</p>
+                    <p class="text-3xl font-bold text-white tracking-tight mt-2">"{{KPI_TOTAL}}"</p>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Prioridade Máxima (Hot)</p>
+                    <div class="flex justify-between items-baseline mt-2">
+                        <p class="text-3xl font-bold text-rose-500 tracking-tight">"{{KPI_ALTA}}"</p>
+                        <span class="text-[10px] font-bold bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/20">Ação Comercial</span>
+                    </div>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Histórico Analisado</p>
+                    <p class="text-3xl font-bold text-slate-300 tracking-tight mt-2">"{{KPI_TICKETS}}"</p>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden group hover:border-slate-800 transition duration-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Maior Demanda Comercial</p>
+                    <p class="text-base font-bold text-blue-400 mt-3 truncate tracking-tight">"{{KPI_TOP}}"</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Frequência por Categoria do Problema</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Distribuição baseada no diagnóstico NLP dos chamados</p>
+                    </div>
+                    <div class="w-full flex-grow">"{{GRAFICO_1}}"</div>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl flex flex-col">
+                    <div class="mb-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Distribuição por Score de Urgência</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Fatias geradas a partir da fórmula de multiplicação peso x volumetria</p>
+                    </div>
+                    <div class="w-full flex-grow">"{{GRAFICO_2}}"</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                <div class="xl:col-span-2 bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-xl flex flex-col">
+                    <div class="p-5 border-b border-slate-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/20">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Painel de Leads Qualificados</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Selecione uma linha para carregar o playbook ao lado</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select id="priorityFilter" onchange="filterTable()" class="border border-slate-800 rounded-lg px-3 py-2 bg-slate-950 text-xs font-semibold focus:outline-none focus:border-blue-500 text-slate-300 transition">
+                                <option value="TODOS">Todos os Níveis</option>
+                                <option value="ALTA">🚨 Apenas ALTA</option>
+                                <option value="MÉDIA">⚠️ Apenas MÉDIA</option>
+                                <option value="BAIXA">🟢 Apenas BAIXA</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-y-auto max-h-[465px] relative">
+                        <table class="min-w-full divide-y divide-slate-900 text-left sticky" id="leadsTable">
+                            <thead class="bg-slate-950/80 text-[11px] font-bold tracking-wider text-slate-500 uppercase sticky top-0 backdrop-blur-md z-10 border-b border-slate-900">
+                                <tr>
+                                    <th class="px-5 py-3.5">Cód. Cliente</th>
+                                    <th class="px-5 py-3.5">Sintoma Técnico</th>
+                                    <th class="px-5 py-3.5">Chamados</th>
+                                    <th class="px-5 py-3.5">Solução Alvo</th>
+                                    <th class="px-5 py-3.5 text-right">Urgência</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-900 text-xs text-slate-300 bg-slate-950/10">
+                                "{{TABLE_ROWS}}"
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/40 border border-slate-900 p-5 rounded-xl shadow-xl space-y-4 min-h-[538px] flex flex-col justify-between">
+                    <div class="space-y-4 flex-grow">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Playbook Comercial</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Geração de abordagem automatizada baseada no gap do cliente</p>
+                        </div>
+                        
+                        <div id="scriptPlaceholder" class="bg-slate-950/50 border border-slate-900/80 rounded-xl p-5 text-center py-24 text-slate-600 border-dashed flex flex-col justify-center items-center h-[380px]">
+                            <svg class="w-8 h-8 mx-auto mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                            <p class="text-xs font-medium px-4">Selecione qualquer cliente na tabela ao lado para extrair o script pronto de vendas da IA.</p>
+                        </div>
+                        
+                        <div id="scriptContentBox" class="hidden space-y-4">
+                            <div class="p-4 bg-slate-950 border border-slate-900 rounded-xl space-y-2 text-xs">
+                                <div class="flex justify-between"><span class="text-slate-500">Alvo Comercial:</span> <span id="viewId" class="font-bold text-white"></span></div>
+                                <div class="flex justify-between"><span class="text-slate-500">Histórico de Dor:</span> <span id="viewCat" class="font-semibold text-blue-400"></span></div>
+                                <div class="flex justify-between"><span class="text-slate-500">Oferta Recomendada:</span> <span id="viewSug" class="font-bold text-emerald-400"></span></div>
+                            </div>
+                            <div class="relative group">
+                                <textarea id="scriptBodyText" readonly class="w-full h-[225px] p-3.5 bg-slate-950 border border-slate-900 rounded-xl text-xs font-mono text-slate-300 focus:outline-none resize-none leading-relaxed"></textarea>
+                                <button onclick="copyToClipboard()" class="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] transition shadow-md">
+                                    Copiar Texto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="copyAlert" class="hidden text-center text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-2 rounded-lg mt-2">
+                        ✓ Copiado para a área de transferência!
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <main id="tab-content-novo-modulo" class="hidden flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Novo Módulo Estratégico</h1>
+                    <p class="text-sm text-slate-400 mt-1">Este espaço foi reservado e está pronto para receber as novas regras de negócio e visualizações.</p>
+                </div>
+            </div>
+
+            <div class="w-full bg-slate-900/20 border-2 border-dashed border-slate-800 rounded-2xl p-12 text-center py-32 flex flex-col justify-center items-center">
+                <div class="h-12 w-12 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4 shadow-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-base font-bold text-slate-200 tracking-tight">Área Reservada para Expansão</h3>
+                <p class="text-xs text-slate-500 max-w-md mt-2 leading-relaxed">
+                    A infraestrutura estrutural da nova página já está operando perfeitamente. Assim que você fornecer os novos parâmetros, gráficos ou tabelas, nós faremos a injeção dos componentes de dados aqui dentro.
+                </p>
+            </div>
+            
+        </main>
+    </div>
+
+    <script>
+        // --- CONTROLE DE MUDANÇA DE ABAS (TABS) ---
+        function switchTab(tabId) {
+            const contentComercial = document.getElementById('tab-content-comercial');
+            const contentNovoModulo = document.getElementById('tab-content-novo-modulo');
+            const btnComercial = document.getElementById('btn-comercial');
+            const btnNovoModulo = document.getElementById('btn-novo-modulo');
+
+            if (tabId === 'comercial') {
+                // Exibe comercial, esconde novo módulo
+                contentComercial.classList.remove('hidden');
+                contentNovoModulo.classList.add('hidden');
+                
+                // Trata estilo do botão ativo
+                btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
+                btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200";
+            } else if (tabId === 'novo-modulo') {
+                // Exibe novo módulo, esconde comercial
+                contentComercial.classList.add('hidden');
+                contentNovoModulo.classList.remove('hidden');
+                
+                // Trata estilo do botão ativo
+                btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
+                btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200";
+            }
+        }
+
+        function filterTable() {
+            const val = document.getElementById('priorityFilter').value;
+            const rows = document.querySelectorAll('#leadsTable tbody tr');
+            rows.forEach(row => {
+                const priority = row.getAttribute('data-priority');
+                if(val === 'TODOS' || priority === val) { row.style.display = ''; } 
+                else { row.style.display = 'none'; }
+            });
+        }
+
+        function loadLeadScript(row) {
+            document.querySelectorAll('#leadsTable tbody tr').forEach(r => r.classList.remove('bg-blue-600/10', 'border-l-2', 'border-blue-500'));
+            row.classList.add('bg-blue-600/10', 'border-l-2', 'border-blue-500');
+
+            const id = row.getAttribute('data-id');
+            const cat = row.getAttribute('data-cat');
+            const sug = row.getAttribute('data-sug');
+            const rawScript = row.querySelector('.hidden-script-source').textContent;
+
+            document.getElementById('scriptPlaceholder').classList.add('hidden');
+            document.getElementById('scriptContentBox').classList.remove('hidden');
+            document.getElementById('copyAlert').classList.add('hidden');
+
+            document.getElementById('viewId').textContent = "Lead #" + id;
+            document.getElementById('viewCat').textContent = cat;
+            document.getElementById('viewSug').textContent = sug;
+            document.getElementById('scriptBodyText').value = rawScript;
+        }
+
+        function copyToClipboard() {
+            const copyText = document.getElementById("scriptBodyText");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value);
+            
+            const alertBox = document.getElementById('copyAlert');
+            alertBox.classList.remove('hidden');
+            setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
+        }
+    </script>
+</body>
+</html>
+"""
+
+@app.get("/", response_class=HTMLResponse)
+def index():
+    return LOGIN_HTML
+
+@app.post("/login", response_class=HTMLResponse)
+def login(username: str = Form(...), password: str = Form(...)):
+    if username != USER_EMAIL or password != USER_PASSWORD:
+        erro_msg = "<div class='bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-xl mb-5 text-center text-xs font-semibold shadow-sm'>As credenciais informadas não coincidem.</div>"
+        return LOGIN_HTML.replace("", erro_msg)
+    
+    caminho_xlsx = os.path.join("output", "oportunidades.xlsx")
+    caminho_csv = os.path.join("output", "oportunidades.csv")
+    
+    df = None
+    if os.path.exists(caminho_xlsx):
+        df = pd.read_excel(caminho_xlsx)
+    elif os.path.exists(caminho_csv):
+        df = pd.read_csv(caminho_csv)
+        
+    if df is None or df.empty:
+        return "<h1 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Erro: O arquivo consolidado não foi localizado na pasta 'output'.</h1>"
+        
+    kpi_total = str(len(df))
+    kpi_alta = str(len(df[df['prioridade_comercial'] == 'ALTA']))
+    kpi_tickets = str(df['qtd_tickets'].sum())
+    kpi_top = str(df['servico_sugerido'].mode()[0]) if not df.empty else "N/A"
+
+    # --- GRAFICO 1 ---
+    fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), 
+                     x='categoria_problema', y='count')
+    fig_cat.update_traces(marker_color='#2563eb', marker_line_color='#1e40af', marker_line_width=1, opacity=0.85)
+    fig_cat.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+        font_color='#94a3b8', font_family='Inter',
+        margin=dict(l=0, r=0, t=10, b=0), height=240,
+        xaxis=dict(showgrid=False, title=""), yaxis=dict(showgrid=True, gridcolor='#1e293b', title="")
+    )
+    html_g1 = pio.to_html(fig_cat, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
+
+    # --- GRAFICO 2 ---
+    fig_prio = px.pie(df, names='prioridade_comercial', hole=0.7,
+                      color='prioridade_comercial',
+                      color_discrete_map={'ALTA':'#f43f5e', 'MÉDIA':'#3b82f6', 'BAIXA':'#64748b'})
+    fig_prio.update_traces(textposition='inside', textinfo='none')
+    fig_prio.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+        font_color='#94a3b8', font_family='Inter',
+        margin=dict(l=0, r=0, t=10, b=0), height=240, showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+    )
+    html_g2 = pio.to_html(fig_prio, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
+
+    # --- LINHAS DA TABELA INTERATIVA ---
+    table_rows = ""
+    for _, row in df.iterrows():
+        prio = row['prioridade_comercial']
+        badge_style = "bg-rose-500/10 text-rose-400 border border-rose-500/20" if prio == 'ALTA' else "bg-blue-500/10 text-blue-400 border border-blue-500/20" if prio == 'MÉDIA' else "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+        dot_color = "bg-rose-500" if prio == 'ALTA' else "bg-blue-500" if prio == 'MÉDIA' else "bg-slate-500"
+        
+        table_rows += f"""
+        <tr class="hover:bg-slate-900/40 cursor-pointer transition border-b border-slate-900" 
+            data-priority="{prio}" data-id="{row['codcli']}" data-cat="{row['categoria_problema']}" data-sug="{row['servico_sugerido']}"
+            onclick="loadLeadScript(this)">
+            <td class="px-5 py-3.5 font-bold text-white tracking-tight">{row['codcli']}</td>
+            <td class="px-5 py-3.5 text-slate-400">{row['categoria_problema']}</td>
+            <td class="px-5 py-3.5 text-slate-300 font-semibold">{row['qtd_tickets']}</td>
+            <td class="px-5 py-3.5 text-slate-200 font-medium">{row['servico_sugerido']}</td>
+            <td class="px-5 py-3.5 text-right">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md {badge_style}">
+                    <span class="w-1.5 h-1.5 rounded-full {dot_color}"></span>
+                    {prio}
+                </span>
+                <div class="hidden hidden-script-source">{row['script_vendas']}</div>
+            </td>
+        </tr>
+        """
+
+    page = DASHBOARD_HTML
+    page = page.replace('""{{KPI_TOTAL}}""', kpi_total).replace('"{{KPI_TOTAL}}"', kpi_total)
+    page = page.replace('""{{KPI_ALTA}}""', kpi_alta).replace('"{{KPI_ALTA}}"', kpi_alta)
+    page = page.replace('""{{KPI_TICKETS}}""', kpi_tickets).replace('"{{KPI_TICKETS}}"', kpi_tickets)
+    page = page.replace('""{{KPI_TOP}}""', kpi_top).replace('"{{KPI_TOP}}"', kpi_top)
+    page = page.replace('""{{GRAFICO_1}}""', html_g1).replace('"{{GRAFICO_1}}"', html_g1)
+    page = page.replace('""{{GRAFICO_2}}""', html_g2).replace('"{{GRAFICO_2}}"', html_g2)
+    page = page.replace('""{{TABLE_ROWS}}""', table_rows).replace('"{{TABLE_ROWS}}"', table_rows)
+
+    return page

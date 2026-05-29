@@ -69,10 +69,10 @@ class SalesOpportunityPipeline:
         self.df_tickets['categoria_nlp'] = self.df_tickets['texto_limpo'].apply(categorize_text)
 
     # ==========================================
-    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES (LOGICA DE RECOMENDAÇÃO ATUALIZADA)
+    # ETAPA 3 - MODELAGEM DE OPORTUNIDADES
     # ==========================================
     def model_opportunities(self):
-        print("--- ETAPA 3: Inteligência de Cross-Selling por Segmento de Mercado ---")
+        print("--- ETAPA 3: Cruzamento Tickets x Serviços Contratados ---")
         
         # Checar se as colunas essenciais existem
         if 'codcli' not in self.df_clients.columns or 'servico' not in self.df_clients.columns:
@@ -105,48 +105,36 @@ class SalesOpportunityPipeline:
             tickets_dict = {}
 
         oportunidades = []
+        for _, row in df_cruzamento.iterrows():
+            cliente = row['codcli']
+            categoria = row['categoria_nlp']
+            qtd = row['qtd_tickets']
+            servicos = row['servicos_contratados']
 
-        # 5. Avaliar oportunidades para cada cliente cadastrado
-        for cliente_id in servicos_por_cliente.keys():
-            segmento_cliente = mapeamento_segmentos.get(cliente_id, "Geral")
-            servicos_atuais = servicos_por_cliente.get(cliente_id, [])
-            
-            # Buscar o ranking de serviços que os concorrentes do mesmo segmento compram
-            servicos_populares_no_segmento = ranking_servicos_segmento[ranking_servicos_segmento['segmento'] == segmento_cliente]
-            
-            # Localizar o primeiro serviço mais popular do segmento que este cliente específico AINDA NÃO possui (GAP)
-            servico_sugerido = None
-            for _, item in servicos_populares_no_segmento.iterrows():
-                servico_analisado = str(item['servico']).upper()
-                if servico_analisado not in servicos_atuais:
-                    servico_sugerido = item['servico']  # Encontramos o gap comercial ideal!
-                    break
-            
-            # Se o cliente já tem todos os serviços populares do segmento dele, passamos para o próximo
-            if not servico_sugerido:
-                continue
+            gap_encontrado = False
+            servico_sugerido = ""
 
-            # Verificar se o cliente possui algum chamado correlacionado na categoria para somar tração de urgência
-            # Mapeia o serviço para a categoria NLP correspondente para pegar o histórico de dores
-            categoria_relacionada = "OUTROS"
-            servico_sugerido_upper = str(servico_sugerido).upper()
-            if "BACKUP" in servico_sugerido_upper: categoria_relacionada = "BACKUP"
-            elif "FIREWALL" in servico_sugerido_upper or "ANTIVIRUS" in servico_sugerido_upper: categoria_relacionada = "SEGURANÇA"
-            elif "LINK" in servico_sugerido_upper or "DEDICADO" in servico_sugerido_upper or "REDE" in servico_sugerido_upper: categoria_relacionada = "INTERNET/REDE"
-            elif "CLOUD" in servico_sugerido_upper or "SERVIDOR" in servico_sugerido_upper: categoria_relacionada = "HOSPEDAGEM/CLOUD"
+            if categoria == "BACKUP" and "BACKUP" not in servicos:
+                gap_encontrado = True
+                servico_sugerido = "Backup Gerenciado"
+            elif categoria == "SEGURANÇA" and ("FIREWALL" not in servicos and "ANTIVIRUS" not in servicos):
+                gap_encontrado = True
+                servico_sugerido = "Pacote de Cibersegurança / Firewall"
+            elif categoria == "INTERNET/REDE" and "ACESSO DEDICADO" not in servicos:
+                gap_encontrado = True
+                servico_sugerido = "Acesso Dedicado Link Corporativo"
 
-            qtd_tickets_dor = tickets_dict.get(cliente_id, {}).get(categoria_relacionada, 0)
-
-            oportunidades.append({
-                'codcli': cliente_id,
-                'segmento': segmento_cliente,
-                'categoria_problema': categoria_relacionada,
-                'qtd_tickets': qtd_tickets_dor if qtd_tickets_dor > 0 else 1, # Se não tiver ticket, inicia com 1 para manter tração comercial
-                'servicos_contratados': ", ".join(servicos_atuais),
-                'servico_sugerido': servico_sugerido
-            })
-
+            if gap_encontrado and qtd >= 1: 
+                oportunidades.append({
+                    'codcli': cliente,
+                    'categoria_problema': categoria,
+                    'qtd_tickets': qtd,
+                    'servicos_contratados': servicos,
+                    'servico_sugerido': servico_sugerido
+                })
+        
         self.df_opps = pd.DataFrame(oportunidades)
+        print(f"Oportunidades filtradas geradas: {self.df_opps.shape[0]} registros.")
 
     # ==========================================
     # ETAPA 4 - SCORE DE OPORTUNIDADE
@@ -162,8 +150,8 @@ class SalesOpportunityPipeline:
         self.df_opps['score_bruto'] = self.df_opps['qtd_tickets'] * self.df_opps['peso']
 
         def classificar_score(score):
-            if score >= 12: return "ALTA"
-            elif score >= 5: return "MÉDIA"
+            if score >= 15: return "ALTA"
+            elif score >= 6: return "MÉDIA"
             else: return "BAIXA"
 
         self.df_opps['prioridade_comercial'] = self.df_opps['score_bruto'].apply(classificar_score)
