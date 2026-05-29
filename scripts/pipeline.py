@@ -218,6 +218,13 @@ class SalesOpportunityPipeline:
             # Se o cliente passou o ano sem reclamações na área técnica do produto, 
             # ele é descartado do pipeline para reduzir o ruído (eliminando os 2.194 leads soltos).
             # ------------------------------------------------------------------------
+# ... código anterior ...
+            qtd_tickets_dor = tickets_dict.get(cliente_id, {}).get(categoria_relacionada, 0)
+
+            # ADICIONE ESTES PRINTS DE DIAGNÓSTICO:
+            if len(oportunidades) < 5: # Vai mostrar apenas os 5 primeiros para não inundar a tela
+                print(f"DEBUG - Cliente: {cliente_id} | Serviço Sugerido: {servico_sugerido} | Categoria: {categoria_relacionada} | Qtd Tickets: {qtd_tickets_dor}")
+
             if qtd_tickets_dor == 0:
                 continue
 
