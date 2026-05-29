@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Form
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 import pandas as pd
 import plotly.express as px
 import plotly.io as pio
@@ -10,6 +11,13 @@ app = FastAPI()
 # Credenciais de acesso
 USER_EMAIL = "rodrigo.cti@senai.com"
 USER_PASSWORD = "cti134"
+
+# Estado em memória para o Kanban persistir durante a sessão
+KANBAN_STATE = {}
+
+class KanbanUpdate(BaseModel):
+    codcli: str
+    nova_coluna: str
 
 # --- TEMPLATE HTML DA TELA DE LOGIN ---
 LOGIN_HTML = """
@@ -67,6 +75,7 @@ DASHBOARD_HTML = """
     <title>Dashboard | Motor de Oportunidades B2B</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -184,8 +193,8 @@ DASHBOARD_HTML = """
                             <thead class="bg-slate-950/80 text-[11px] font-bold tracking-wider text-slate-500 uppercase sticky top-0 backdrop-blur-md z-10 border-b border-slate-900">
                                 <tr>
                                     <th class="px-5 py-3.5">Cód. Cliente</th>
-                                    <th class="px-5 py-3.5">Sintoma Técnico</th>
-                                    <th class="px-5 py-3.5">Chamados</th>
+                                    <th class="px-5 py-3.5">Segmento</th>
+                                    <th class="px-5 py-3.5">Categoria Vinculada</th>
                                     <th class="px-5 py-3.5">Solução Alvo</th>
                                     <th class="px-5 py-3.5 text-right">Urgência</th>
                                 </tr>
@@ -212,11 +221,12 @@ DASHBOARD_HTML = """
                         <div id="scriptContentBox" class="hidden space-y-4">
                             <div class="p-4 bg-slate-950 border border-slate-900 rounded-xl space-y-2 text-xs">
                                 <div class="flex justify-between"><span class="text-slate-500">Alvo Comercial:</span> <span id="viewId" class="font-bold text-white"></span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">Histórico de Dor:</span> <span id="viewCat" class="font-semibold text-blue-400"></span></div>
+                                <div class="flex justify-between"><span class="text-slate-500">Segmento Setorial:</span> <span id="viewSegm" class="font-bold text-yellow-500"></span></div>
+                                <div class="flex justify-between"><span class="text-slate-500">Categoria Vinculada:</span> <span id="viewCat" class="font-semibold text-blue-400"></span></div>
                                 <div class="flex justify-between"><span class="text-slate-500">Oferta Recomendada:</span> <span id="viewSug" class="font-bold text-emerald-400"></span></div>
                             </div>
                             <div class="relative group">
-                                <textarea id="scriptBodyText" readonly class="w-full h-[225px] p-3.5 bg-slate-950 border border-slate-900 rounded-xl text-xs font-mono text-slate-300 focus:outline-none resize-none leading-relaxed"></textarea>
+                                <textarea id="scriptBodyText" readonly class="w-full h-[210px] p-3.5 bg-slate-950 border border-slate-900 rounded-xl text-xs font-mono text-slate-300 focus:outline-none resize-none leading-relaxed"></textarea>
                                 <button onclick="copyToClipboard()" class="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] transition shadow-md">
                                     Copiar Texto
                                 </button>
@@ -232,31 +242,60 @@ DASHBOARD_HTML = """
         </main>
 
         <main id="tab-content-novo-modulo" class="hidden flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-            
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
                 <div>
-                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Novo Módulo Estratégico</h1>
-                    <p class="text-sm text-slate-400 mt-1">Este espaço foi reservado e está pronto para receber as novas regras de negócio e visualizações.</p>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Painel de Chamados & Negócios</h1>
+                    <p class="text-sm text-slate-400 mt-1">Gerencie a evolução das propostas comerciais arrastando os cards através das etapas do funil.</p>
                 </div>
-            </div>
-
-            <div class="w-full bg-slate-900/20 border-2 border-dashed border-slate-800 rounded-2xl p-12 text-center py-32 flex flex-col justify-center items-center">
-                <div class="h-12 w-12 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4 shadow-lg">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                    </svg>
-                </div>
-                <h3 class="text-base font-bold text-slate-200 tracking-tight">Área Reservada para Expansão</h3>
-                <p class="text-xs text-slate-500 max-w-md mt-2 leading-relaxed">
-                    A infraestrutura estrutural da nova página já está operando perfeitamente. Assim que você fornecer os novos parâmetros, gráficos ou tabelas, nós faremos a injeção dos componentes de dados aqui dentro.
-                </p>
             </div>
             
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start min-h-[550px]">
+                
+                <div class="bg-slate-900/40 border border-slate-900 rounded-xl p-4 flex flex-col h-full min-h-[500px]">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400">📋 A Fazer Proposta</h3>
+                        <span class="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-afazer">0</span>
+                    </div>
+                    <div id="col-afazer" data-status="afazer" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
+                        "{{KANBAN_AFAZER}}"
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/40 border border-slate-900 rounded-xl p-4 flex flex-col h-full min-h-[500px]">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400">⏳ Aguardando Respostas</h3>
+                        <span class="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-aguardando">0</span>
+                    </div>
+                    <div id="col-aguardando" data-status="aguardando" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
+                        "{{KANBAN_AGUARDANDO}}"
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/40 border border-slate-900 rounded-xl p-4 flex flex-col h-full min-h-[500px]">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-rose-400">❌ Recusado</h3>
+                        <span class="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-recusado">0</span>
+                    </div>
+                    <div id="col-recusado" data-status="recusado" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
+                        "{{KANBAN_RECUSADO}}"
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/40 border border-slate-900 rounded-xl p-4 flex flex-col h-full min-h-[500px]">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400">✅ Aceito</h3>
+                        <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-aceito">0</span>
+                    </div>
+                    <div id="col-aceito" data-status="aceito" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
+                        "{{KANBAN_ACEITO}}"
+                    </div>
+                </div>
+
+            </div>
         </main>
     </div>
 
     <script>
-        // --- CONTROLE DE MUDANÇA DE ABAS (TABS) ---
         function switchTab(tabId) {
             const contentComercial = document.getElementById('tab-content-comercial');
             const contentNovoModulo = document.getElementById('tab-content-novo-modulo');
@@ -264,21 +303,16 @@ DASHBOARD_HTML = """
             const btnNovoModulo = document.getElementById('btn-novo-modulo');
 
             if (tabId === 'comercial') {
-                // Exibe comercial, esconde novo módulo
                 contentComercial.classList.remove('hidden');
                 contentNovoModulo.classList.add('hidden');
-                
-                // Trata estilo do botão ativo
                 btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
                 btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200";
             } else if (tabId === 'novo-modulo') {
-                // Exibe novo módulo, esconde comercial
                 contentComercial.classList.add('hidden');
                 contentNovoModulo.classList.remove('hidden');
-                
-                // Trata estilo do botão ativo
                 btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
                 btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200";
+                calculateCounters();
             }
         }
 
@@ -297,6 +331,7 @@ DASHBOARD_HTML = """
             row.classList.add('bg-blue-600/10', 'border-l-2', 'border-blue-500');
 
             const id = row.getAttribute('data-id');
+            const segmento = row.getAttribute('data-segmento');
             const cat = row.getAttribute('data-cat');
             const sug = row.getAttribute('data-sug');
             const rawScript = row.querySelector('.hidden-script-source').textContent;
@@ -306,6 +341,7 @@ DASHBOARD_HTML = """
             document.getElementById('copyAlert').classList.add('hidden');
 
             document.getElementById('viewId').textContent = "Lead #" + id;
+            document.getElementById('viewSegm').textContent = segmento;
             document.getElementById('viewCat').textContent = cat;
             document.getElementById('viewSug').textContent = sug;
             document.getElementById('scriptBodyText').value = rawScript;
@@ -321,6 +357,40 @@ DASHBOARD_HTML = """
             alertBox.classList.remove('hidden');
             setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
         }
+
+        // --- SCRIPTS DO KANBAN ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const zones = document.querySelectorAll('.kanban-zone');
+            zones.forEach(zone => {
+                new Sortable(zone, {
+                    group: 'kanban-crm',
+                    animation: 150,
+                    ghostClass: 'bg-slate-800/50',
+                    onEnd: function (evt) {
+                        const itemEl = evt.item;
+                        const clientCode = itemEl.getAttribute('data-id');
+                        const destination = evt.to.getAttribute('data-status');
+                        
+                        fetch('/api/kanban/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ codcli: clientCode, nova_coluna: destination })
+                        })
+                        .then(res => res.json())
+                        .then(() => { calculateCounters(); })
+                        .catch(err => console.error("Falha ao salvar:", err));
+                    }
+                });
+            });
+            calculateCounters();
+        });
+
+        function calculateCounters() {
+            document.getElementById('count-afazer').textContent = document.getElementById('col-afazer').children.length;
+            document.getElementById('count-aguardando').textContent = document.getElementById('col-aguardando').children.length;
+            document.getElementById('count-recusado').textContent = document.getElementById('col-recusado').children.length;
+            document.getElementById('count-aceito').textContent = document.getElementById('col-aceito').children.length;
+        }
     </script>
 </body>
 </html>
@@ -332,6 +402,7 @@ def index():
 
 @app.post("/login", response_class=HTMLResponse)
 def login(username: str = Form(...), password: str = Form(...)):
+    global KANBAN_STATE
     if username != USER_EMAIL or password != USER_PASSWORD:
         erro_msg = "<div class='bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-xl mb-5 text-center text-xs font-semibold shadow-sm'>As credenciais informadas não coincidem.</div>"
         return LOGIN_HTML.replace("", erro_msg)
@@ -354,44 +425,48 @@ def login(username: str = Form(...), password: str = Form(...)):
     kpi_top = str(df['servico_sugerido'].mode()[0]) if not df.empty else "N/A"
 
     # --- GRAFICO 1 ---
-    fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), 
-                     x='categoria_problema', y='count')
+    fig_cat = px.bar(df['categoria_problema'].value_counts().reset_index(), x='categoria_problema', y='count')
     fig_cat.update_traces(marker_color='#2563eb', marker_line_color='#1e40af', marker_line_width=1, opacity=0.85)
     fig_cat.update_layout(
-        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-        font_color='#94a3b8', font_family='Inter',
-        margin=dict(l=0, r=0, t=10, b=0), height=240,
-        xaxis=dict(showgrid=False, title=""), yaxis=dict(showgrid=True, gridcolor='#1e293b', title="")
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8', font_family='Inter',
+        margin=dict(l=0, r=0, t=10, b=0), height=240, xaxis=dict(showgrid=False, title=""), yaxis=dict(showgrid=True, gridcolor='#1e293b', title="")
     )
     html_g1 = pio.to_html(fig_cat, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
     # --- GRAFICO 2 ---
-    fig_prio = px.pie(df, names='prioridade_comercial', hole=0.7,
-                      color='prioridade_comercial',
-                      color_discrete_map={'ALTA':'#f43f5e', 'MÉDIA':'#3b82f6', 'BAIXA':'#64748b'})
+    fig_prio = px.pie(df, names='prioridade_comercial', hole=0.7, color='prioridade_comercial', color_discrete_map={'ALTA':'#f43f5e', 'MÉDIA':'#3b82f6', 'BAIXA':'#64748b'})
     fig_prio.update_traces(textposition='inside', textinfo='none')
     fig_prio.update_layout(
-        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-        font_color='#94a3b8', font_family='Inter',
-        margin=dict(l=0, r=0, t=10, b=0), height=240, showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8', font_family='Inter',
+        margin=dict(l=0, r=0, t=10, b=0), height=240, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
     )
     html_g2 = pio.to_html(fig_prio, full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-    # --- LINHAS DA TABELA INTERATIVA ---
-    table_rows = ""
+    # Inicializa todos os clientes do Painel no estado padrão "A Fazer" caso estejam entrando pela primeira vez
     for _, row in df.iterrows():
+        cid = str(row['codcli'])
+        if cid not in KANBAN_STATE:
+            KANBAN_STATE[cid] = "afazer"
+
+    table_rows = ""
+    kanban_buffers = {"afazer": "", "aguardando": "", "recusado": "", "aceito": ""}
+    
+    for _, row in df.iterrows():
+        cid = str(row['codcli'])
         prio = row['prioridade_comercial']
+        segmento_txt = str(row['segmento']) if 'segmento' in df.columns and pd.notna(row['segmento']) else "Não Informado"
+        
         badge_style = "bg-rose-500/10 text-rose-400 border border-rose-500/20" if prio == 'ALTA' else "bg-blue-500/10 text-blue-400 border border-blue-500/20" if prio == 'MÉDIA' else "bg-slate-500/10 text-slate-400 border border-slate-500/20"
         dot_color = "bg-rose-500" if prio == 'ALTA' else "bg-blue-500" if prio == 'MÉDIA' else "bg-slate-500"
         
+        # Renderização das Linhas da Tabela (Idêntica)
         table_rows += f"""
         <tr class="hover:bg-slate-900/40 cursor-pointer transition border-b border-slate-900" 
-            data-priority="{prio}" data-id="{row['codcli']}" data-cat="{row['categoria_problema']}" data-sug="{row['servico_sugerido']}"
+            data-priority="{prio}" data-id="{cid}" data-segmento="{segmento_txt}" data-cat="{row['categoria_problema']}" data-sug="{row['servico_sugerido']}"
             onclick="loadLeadScript(this)">
-            <td class="px-5 py-3.5 font-bold text-white tracking-tight">{row['codcli']}</td>
+            <td class="px-5 py-3.5 font-bold text-white tracking-tight">{cid}</td>
+            <td class="px-5 py-3.5 text-yellow-500 font-medium">{segmento_txt}</td>
             <td class="px-5 py-3.5 text-slate-400">{row['categoria_problema']}</td>
-            <td class="px-5 py-3.5 text-slate-300 font-semibold">{row['qtd_tickets']}</td>
             <td class="px-5 py-3.5 text-slate-200 font-medium">{row['servico_sugerido']}</td>
             <td class="px-5 py-3.5 text-right">
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-md {badge_style}">
@@ -402,6 +477,23 @@ def login(username: str = Form(...), password: str = Form(...)):
             </td>
         </tr>
         """
+        
+        # Estrutura visual limpa e combinando perfeitamente com os cartões para as colunas do Kanban
+        card_html = f"""
+        <div data-id="{cid}" class="bg-slate-950 border border-slate-800 hover:border-slate-700 p-3.5 rounded-xl shadow-md cursor-grab active:cursor-grabbing transition space-y-2">
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold text-white">Cliente #{cid}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded {badge_style}">{prio}</span>
+            </div>
+            <p class="text-[11px] text-yellow-500 font-medium tracking-tight">🏢 Segmento: {segmento_txt}</p>
+            <div class="border-t border-slate-900 pt-2">
+                <p class="text-[10px] text-slate-500 uppercase font-semibold">Solução Alvo:</p>
+                <p class="text-xs text-slate-200 font-medium truncate">{row['servico_sugerido']}</p>
+            </div>
+        </div>
+        """
+        status_do_lead = KANBAN_STATE.get(cid, "afazer")
+        kanban_buffers[status_do_lead] += card_html
 
     page = DASHBOARD_HTML
     page = page.replace('""{{KPI_TOTAL}}""', kpi_total).replace('"{{KPI_TOTAL}}"', kpi_total)
@@ -411,5 +503,19 @@ def login(username: str = Form(...), password: str = Form(...)):
     page = page.replace('""{{GRAFICO_1}}""', html_g1).replace('"{{GRAFICO_1}}"', html_g1)
     page = page.replace('""{{GRAFICO_2}}""', html_g2).replace('"{{GRAFICO_2}}"', html_g2)
     page = page.replace('""{{TABLE_ROWS}}""', table_rows).replace('"{{TABLE_ROWS}}"', table_rows)
+    
+    # Injeção das colunas de cards processadas na aba reservada
+    page = page.replace('""{{KANBAN_AFAZER}}""', kanban_buffers["afazer"]).replace('"{{KANBAN_AFAZER}}"', kanban_buffers["afazer"])
+    page = page.replace('""{{KANBAN_AGUARDANDO}}""', kanban_buffers["aguardando"]).replace('"{{KANBAN_AGUARDANDO}}"', kanban_buffers["aguardando"])
+    page = page.replace('""{{KANBAN_RECUSADO}}""', kanban_buffers["recusado"]).replace('"{{KANBAN_RECUSADO}}"', kanban_buffers["recusado"])
+    page = page.replace('""{{KANBAN_ACEITO}}""', kanban_buffers["aceito"]).replace('"{{KANBAN_ACEITO}}"', kanban_buffers["aceito"])
 
     return page
+
+# Endpoint assíncrono para o drag-and-drop salvar a posição na memória do servidor
+@app.post("/api/kanban/save")
+def save_kanban_position(data: KanbanUpdate):
+    if data.nova_coluna not in ["afazer", "aguardando", "recusado", "aceito"]:
+        raise HTTPException(status_code=400, detail="Etapa do funil inválida")
+    KANBAN_STATE[data.codcli] = data.nova_coluna
+    return JSONResponse(content={"status": "success"})
