@@ -69,7 +69,6 @@ DASHBOARD_HTML = """
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Scrollbars customizadas e discretas para o modo dark */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
@@ -82,15 +81,26 @@ DASHBOARD_HTML = """
         
         <header class="border-b border-slate-900 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-600/20">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <div class="flex items-center gap-8">
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-600/20">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <div>
+                            <span class="text-sm font-bold tracking-tight text-white">Motor de Vendas B2B</span>
+                        </div>
                     </div>
-                    <div>
-                        <span class="text-sm font-bold tracking-tight text-white">Motor de Vendas B2B</span>
-                        <span class="hidden sm:inline-block ml-2 text-xs font-semibold bg-slate-900 px-2 py-0.5 rounded text-slate-400 border border-slate-800">v2.2</span>
-                    </div>
+                    
+                    <nav class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-900">
+                        <button onclick="switchTab('comercial')" id="btn-comercial" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm">
+                            Painel Comercial
+                        </button>
+                        <button onclick="switchTab('novo-modulo')" id="btn-novo-modulo" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200">
+                            Novo Módulo
+                        </button>
+                    </nav>
                 </div>
+                
                 <div class="flex items-center gap-4">
                     <div class="text-right hidden sm:block">
                         <p class="text-xs font-semibold text-slate-200">Rodrigo</p>
@@ -104,7 +114,7 @@ DASHBOARD_HTML = """
             </div>
         </header>
 
-        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <main id="tab-content-comercial" class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
             
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
                 <div>
@@ -153,7 +163,6 @@ DASHBOARD_HTML = """
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-                
                 <div class="xl:col-span-2 bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-xl flex flex-col">
                     <div class="p-5 border-b border-slate-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/20">
                         <div>
@@ -196,7 +205,7 @@ DASHBOARD_HTML = """
                         </div>
                         
                         <div id="scriptPlaceholder" class="bg-slate-950/50 border border-slate-900/80 rounded-xl p-5 text-center py-24 text-slate-600 border-dashed flex flex-col justify-center items-center h-[380px]">
-                            <svg class="w-8 h-8 mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                            <svg class="w-8 h-8 mx-auto mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
                             <p class="text-xs font-medium px-4">Selecione qualquer cliente na tabela ao lado para extrair o script pronto de vendas da IA.</p>
                         </div>
                         
@@ -221,9 +230,58 @@ DASHBOARD_HTML = """
                 </div>
             </div>
         </main>
+
+        <main id="tab-content-novo-modulo" class="hidden flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Novo Módulo Estratégico</h1>
+                    <p class="text-sm text-slate-400 mt-1">Este espaço foi reservado e está pronto para receber as novas regras de negócio e visualizações.</p>
+                </div>
+            </div>
+
+            <div class="w-full bg-slate-900/20 border-2 border-dashed border-slate-800 rounded-2xl p-12 text-center py-32 flex flex-col justify-center items-center">
+                <div class="h-12 w-12 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4 shadow-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-base font-bold text-slate-200 tracking-tight">Área Reservada para Expansão</h3>
+                <p class="text-xs text-slate-500 max-w-md mt-2 leading-relaxed">
+                    A infraestrutura estrutural da nova página já está operando perfeitamente. Assim que você fornecer os novos parâmetros, gráficos ou tabelas, nós faremos a injeção dos componentes de dados aqui dentro.
+                </p>
+            </div>
+            
+        </main>
     </div>
 
     <script>
+        // --- CONTROLE DE MUDANÇA DE ABAS (TABS) ---
+        function switchTab(tabId) {
+            const contentComercial = document.getElementById('tab-content-comercial');
+            const contentNovoModulo = document.getElementById('tab-content-novo-modulo');
+            const btnComercial = document.getElementById('btn-comercial');
+            const btnNovoModulo = document.getElementById('btn-novo-modulo');
+
+            if (tabId === 'comercial') {
+                // Exibe comercial, esconde novo módulo
+                contentComercial.classList.remove('hidden');
+                contentNovoModulo.classList.add('hidden');
+                
+                // Trata estilo do botão ativo
+                btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
+                btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200";
+            } else if (tabId === 'novo-modulo') {
+                // Exibe novo módulo, esconde comercial
+                contentComercial.classList.add('hidden');
+                contentNovoModulo.classList.remove('hidden');
+                
+                // Trata estilo do botão ativo
+                btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
+                btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200";
+            }
+        }
+
         function filterTable() {
             const val = document.getElementById('priorityFilter').value;
             const rows = document.querySelectorAll('#leadsTable tbody tr');
