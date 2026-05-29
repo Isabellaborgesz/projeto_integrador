@@ -56,7 +56,7 @@ LOGIN_HTML = """
                     <input type="password" name="password" placeholder="••••••••" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition text-slate-200 placeholder-slate-600">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-150 text-sm shadow-xl shadow-blue-600/10 mt-2">
-                    Entrar no Painel
+                    Entrar no Panel
                 </button>
             </form>
         </div>
@@ -260,12 +260,23 @@ DASHBOARD_HTML = """
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start min-h-[550px]">
+                
                 <div class="bg-slate-900/40 border border-slate-900 rounded-xl p-4 flex flex-col h-full min-h-[500px]">
-                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400">📋 A Fazer Proposta</h3>
                         <span class="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-bold px-2 py-0.5 rounded-full" id="count-afazer">0</span>
                     </div>
-                    <div id="col-afazer" data-status="afazer" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[500px] pb-6">
+                    
+                    <div class="relative mb-4">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-500">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </span>
+                        <input type="text" id="kanbanSearchInput" onkeyup="filterKanbanAFazer()" placeholder="Buscar ID nesta coluna..." class="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition">
+                    </div>
+
+                    <div id="col-afazer" data-status="afazer" class="kanban-zone flex-grow space-y-2 overflow-y-auto max-h-[440px] pb-6">
                         "{{KANBAN_AFAZER}}"
                     </div>
                 </div>
@@ -324,7 +335,7 @@ DASHBOARD_HTML = """
             }
         }
 
-        // --- LÓGICA DE FILTRAGEM UNIFICADA (PESQUISA + PRIORIDADE) ---
+        // Filtro da Tabela Principal
         function filterTable() {
             const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
             const filterVal = document.getElementById('priorityFilter').value;
@@ -335,15 +346,28 @@ DASHBOARD_HTML = """
                 const segmento = row.getAttribute('data-segmento').toLowerCase();
                 const priority = row.getAttribute('data-priority');
                 
-                // Verifica o termo da busca (no ID ou no Segmento)
                 const matchesSearch = id.includes(searchVal) || segmento.includes(searchVal);
-                // Verifica a prioridade selecionada
                 const matchesPriority = (filterVal === 'TODOS' || priority === filterVal);
                 
-                if (matchesSearch && matchesPriority) {
-                    row.style.display = '';
+                if (matchesSearch && matchesPriority) { row.style.display = ''; } 
+                else { row.style.display = 'none'; }
+            });
+        }
+
+        // FILTRO CIRÚRGICO DA COLUNA "A FAZER PROPOSTA"
+        function filterKanbanAFazer() {
+            const searchVal = document.getElementById('kanbanSearchInput').value.toLowerCase().trim();
+            const cards = document.querySelectorAll('#col-afazer > div');
+            
+            cards.forEach(card => {
+                const id = card.getAttribute('data-id').toLowerCase();
+                // Também pesquisa opcionalmente pelo segmento guardado no texto interno do card
+                const innerText = card.textContent.toLowerCase();
+                
+                if (id.includes(searchVal) || innerText.includes(searchVal)) {
+                    card.style.display = '';
                 } else {
-                    row.style.display = 'none';
+                    card.style.display = 'none';
                 }
             });
         }
@@ -408,10 +432,10 @@ DASHBOARD_HTML = """
         });
 
         function calculateCounters() {
-            document.getElementById('count-afazer').textContent = document.getElementById('col-afazer').children.length;
-            document.getElementById('count-aguardando').textContent = document.getElementById('col-aguardando').children.length;
-            document.getElementById('count-recusado').textContent = document.getElementById('col-recusado').children.length;
-            document.getElementById('count-aceito').textContent = document.getElementById('col-aceito').children.length;
+            document.getElementById('count-afazer').textContent = document.querySelectorAll('#col-afazer > div').length;
+            document.getElementById('count-aguardando').textContent = document.querySelectorAll('#col-aguardando > div').length;
+            document.getElementById('count-recusado').textContent = document.querySelectorAll('#col-recusado > div').length;
+            document.getElementById('count-aceito').textContent = document.querySelectorAll('#col-aceito > div').length;
         }
     </script>
 </body>
