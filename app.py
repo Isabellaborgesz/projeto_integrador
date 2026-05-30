@@ -105,7 +105,7 @@ DASHBOARD_HTML = """
                             Painel Comercial
                         </button>
                         <button onclick="switchTab('novo-modulo')" id="btn-novo-modulo" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-slate-200">
-                            Novo Módulo
+                            Kanbam
                         </button>
                     </nav>
                 </div>
