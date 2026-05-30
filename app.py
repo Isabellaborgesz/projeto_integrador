@@ -56,7 +56,7 @@ LOGIN_HTML = """
                     <input type="password" name="password" placeholder="••••••••" required class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition text-slate-200 placeholder-slate-600">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-150 text-sm shadow-xl shadow-blue-600/10 mt-2">
-                    Entrar no Panel
+                    Entrar no Painel
                 </button>
             </form>
         </div>
