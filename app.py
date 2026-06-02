@@ -538,10 +538,10 @@ def login(username: str = Form(...), password: str = Form(...)):
         prioridade = str(row['prioridade_comercial'])
         tickets = str(row['qtd_tickets'])
         
-        # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA
+    
         # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA
         # ATENÇÃO: O texto abaixo deve ser EXATAMENTE igual ao cabeçalho da coluna no seu arquivo
-        coluna_servico = 'servico_contratado' 
+        coluna_servico = 'servico_contratados' 
         
         if coluna_servico in row.index:
             val = row[coluna_servico]
