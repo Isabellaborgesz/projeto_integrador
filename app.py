@@ -539,7 +539,7 @@ def login(username: str = Form(...), password: str = Form(...)):
         tickets = str(row['qtd_tickets'])
         
         # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA
-        servico_atual = str(row.get('servico_contratado', 'Nenhum')).strip()
+        servico_atual = str(row.get('servico', 'Nenhum')).strip()
 
         # Tratamento do script antigo (mantendo o fallback dinâmico)
         script_texto = str(row.get('script_abordagem', '')).strip()
