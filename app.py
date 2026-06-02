@@ -539,8 +539,19 @@ def login(username: str = Form(...), password: str = Form(...)):
         tickets = str(row['qtd_tickets'])
         
         # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA
-        servico_atual = str(row.get('servico', 'Nenhum')).strip()
-
+        # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA
+        # ATENÇÃO: O texto abaixo deve ser EXATAMENTE igual ao cabeçalho da coluna no seu arquivo
+        coluna_servico = 'servico_contratado' 
+        
+        if coluna_servico in row.index:
+            val = row[coluna_servico]
+            # Trata células vazias do Pandas (NaN), nulas ou strings em branco
+            if pd.isna(val) or str(val).strip().lower() in ["nan", "none", "", "null"]:
+                servico_atual = "Nenhum"
+            else:
+                servico_atual = str(val).strip()
+        else:
+            servico_atual = "Nenhum"
         # Tratamento do script antigo (mantendo o fallback dinâmico)
         script_texto = str(row.get('script_abordagem', '')).strip()
         if script_texto in ["", "nan", "None", "Script não gerado."]:
