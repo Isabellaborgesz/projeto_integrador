@@ -181,7 +181,7 @@ DASHBOARD_HTML = """
                 <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl flex flex-col shadow-sm">
                     <div class="mb-4">
                         <h3 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Frequência por Categoria do Problema</h3>
-                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Distribuição baseada no diagnóstico NLP dos chamados</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Distribuição baseada no diagnóstico dos chamados</p>
                     </div>
                     <div class="w-full flex-grow">{{GRAFICO_1}}</div>
                 </div>
