@@ -541,7 +541,7 @@ def login(username: str = Form(...), password: str = Form(...)):
     
         # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA
         # ATENÇÃO: O texto abaixo deve ser EXATAMENTE igual ao cabeçalho da coluna no seu arquivo
-        coluna_servico = 'servico_contratados' 
+        coluna_servico = 'servicos_contratados' 
         
         if coluna_servico in row.index:
             val = row[coluna_servico]
