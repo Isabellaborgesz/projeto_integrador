@@ -501,19 +501,22 @@ def login(username: str = Form(...), password: str = Form(...)):
         prioridade = str(row['prioridade_comercial'])
         tickets = str(row['qtd_tickets'])
         
-        # 1. TRATAMENTO DO SCRIPT: Ignora textos nulos ou o erro do pipeline
+        # 1. PEGA O SERVIÇO QUE O CLIENTE JÁ CONTRATA (Ajuste o nome da coluna se for diferente no Excel)
+        servico_atual = str(row.get('servico_contratado', 'Nenhum')).strip()
+
+        # Tratamento do script antigo (mantendo o fallback dinâmico)
         script_texto = str(row.get('script_abordagem', '')).strip()
         if script_texto in ["", "nan", "None", "Script não gerado."]:
-            script_texto = f"Olá, tudo bem?\n\nNotamos que a sua empresa tem aberto chamados recentes relacionados a {categoria}.\n\nPara resolver essa dor de forma definitiva e otimizar a operação no setor de {segmento}, sugerimos a nossa solução de {solucao}.\n\nPodemos agendar um bate-papo rápido de 10 minutos para eu te mostrar como isso funciona na prática?"
+            script_texto = f"Olá, identificamos chamados sobre {categoria} e sugerimos a solução {solucao}."
 
         cor_prio = "text-rose-500" if prioridade == "ALTA" else ("text-blue-400" if prioridade == "MÉDIA" else "text-slate-400")
         
-        # 2. LINHA DA TABELA: Removido o "({tickets})" ao lado da variável {prioridade}
+        # 2. LINHA DA TABELA OPERACIONAL (Adicionado data-servico para o Javascript ler se necessário)
         table_rows += f"""
-        <tr data-id="{cid}" data-segmento="{segmento}" data-priority="{prioridade}" data-cat="{categoria}" data-sug="{solucao}" onclick="loadLeadScript(this)" class="hover:bg-slate-900/40 cursor-pointer border-b border-slate-900/60 transition duration-150 group">
+        <tr data-id="{cid}" data-segmento="{segmento}" data-priority="{prioridade}" data-cat="{categoria}" data-sug="{solucao}" data-servico="{servico_atual}" onclick="loadLeadScript(this)" class="hover:bg-slate-900/40 cursor-pointer border-b border-slate-900/60 transition duration-150 group">
             <td class="px-5 py-3 font-semibold text-white">#{cid}</td>
             <td class="px-5 py-3 text-slate-400 font-medium">{segmento}</td>
-            <td class="px-5 py-3 text-blue-400 font-semibold">{categoria}</td>
+            <td class="px-5 py-3 text-amber-400 font-medium">{servico_atual}</td> <td class="px-5 py-3 text-blue-400 font-semibold">{categoria}</td>
             <td class="px-5 py-3 text-emerald-400 font-medium">{solucao}</td>
             <td class="px-5 py-3 text-right font-bold {cor_prio}">{prioridade}
                 <div class="hidden hidden-script-source">{script_texto}</div>
