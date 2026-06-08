@@ -84,6 +84,7 @@ DASHBOARD_HTML = """
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
     <script>
         tailwind.config = { darkMode: 'class' };
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -124,6 +125,9 @@ DASHBOARD_HTML = """
                         </button>
                         <button onclick="switchTab('novo-modulo')" id="btn-novo-modulo" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
                             Kanban
+                        </button>
+                        <button onclick="switchTab('churn')" id="btn-churn" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                            Churn
                         </button>
                     </nav>
                 </div>
@@ -337,6 +341,109 @@ DASHBOARD_HTML = """
                 </div>
             </div>
         </main>
+
+        <main id="tab-content-churn" class="hidden flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-900 pb-6">
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">Análise de Risco de Churn</h1>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Score calculado por nível do cliente, portfólio de serviços e oportunidades não aproveitadas.</p>
+                </div>
+            </div>
+
+            <!-- KPIs Churn -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden">
+                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-rose-500"></div>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Risco Alto</p>
+                    <p class="text-3xl font-bold text-rose-500 tracking-tight mt-2" id="churn-kpi-alto">—</p>
+                    <p class="text-xs text-slate-400 mt-1">segmentos com taxa ≥ 60%</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden">
+                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-amber-500"></div>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Risco Médio</p>
+                    <p class="text-3xl font-bold text-amber-500 tracking-tight mt-2" id="churn-kpi-medio">—</p>
+                    <p class="text-xs text-slate-400 mt-1">segmentos com taxa 35–60%</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden">
+                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-emerald-500"></div>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Risco Baixo</p>
+                    <p class="text-3xl font-bold text-emerald-500 tracking-tight mt-2" id="churn-kpi-baixo">—</p>
+                    <p class="text-xs text-slate-400 mt-1">segmentos com taxa &lt; 35%</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-sm relative overflow-hidden">
+                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-blue-500"></div>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Taxa Global de Churn</p>
+                    <p class="text-3xl font-bold text-blue-500 tracking-tight mt-2" id="churn-kpi-avg">—</p>
+                    <p class="text-xs text-slate-400 mt-1">% clientes nível C na base</p>
+                </div>
+            </div>
+
+            <!-- Gráficos Churn -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Score Médio por Segmento</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mb-4">Top 10 segmentos com maior risco médio</p>
+                    <div id="churn-chart-seg" style="height:260px"></div>
+                </div>
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Distribuição por Classificação</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mb-4">Proporção de clientes por faixa de risco</p>
+                    <div id="churn-chart-donut" style="height:260px"></div>
+                </div>
+            </div>
+
+            <!-- Tabela + Detalhe Churn -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                <div class="xl:col-span-2 bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-900 rounded-xl overflow-hidden shadow-xl flex flex-col">
+                    <div class="p-5 border-b border-slate-200 dark:border-slate-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 dark:bg-slate-900/20">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Clientes por Risco de Churn</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Clique em uma linha para ver o detalhamento</p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <input type="text" id="churnSearch" onkeyup="filterChurnTable()" placeholder="🔍 Buscar cliente ou segmento..." class="pl-3 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 transition w-52">
+                            <select id="churnFilterRisco" onchange="filterChurnTable()" class="border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs font-semibold focus:outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300 transition">
+                                <option value="">Todos os Riscos</option>
+                                <option value="ALTO">🔴 Alto (≥60%)</option>
+                                <option value="MEDIO">🟡 Médio (35–60%)</option>
+                                <option value="BAIXO">🟢 Baixo (&lt;35%)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto max-h-[465px]">
+                        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-900 text-left" id="churnTable">
+                            <thead class="bg-slate-100/90 dark:bg-slate-950/80 text-[11px] font-bold tracking-wider text-slate-500 uppercase sticky top-0 backdrop-blur-md z-10 border-b border-slate-200 dark:border-slate-900">
+                                <tr>
+                                    <th class="px-5 py-3.5">Segmento</th>
+                                    <th class="px-5 py-3.5">Total Clientes</th>
+                                    <th class="px-5 py-3.5">Nível C</th>
+                                    <th class="px-5 py-3.5">Taxa de Churn</th>
+                                    <th class="px-5 py-3.5">Classificação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="churnTableBody" class="divide-y divide-slate-200 dark:divide-slate-900 text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950/10">
+                                <tr><td colspan="5" class="px-5 py-8 text-center text-slate-400">Carregando dados...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex items-center justify-center gap-3 py-3 border-t border-slate-200 dark:border-slate-900">
+                        <button onclick="churnChangePage(-1)" class="border border-slate-200 dark:border-slate-800 hover:border-blue-500 text-slate-600 dark:text-slate-400 hover:text-blue-500 px-3 py-1 rounded-lg text-xs font-medium transition" id="churnBtnPrev">← Anterior</button>
+                        <span class="text-xs text-slate-500 font-mono" id="churnPageInfo"></span>
+                        <button onclick="churnChangePage(1)" class="border border-slate-200 dark:border-slate-800 hover:border-blue-500 text-slate-600 dark:text-slate-400 hover:text-blue-500 px-3 py-1 rounded-lg text-xs font-medium transition" id="churnBtnNext">Próxima →</button>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-900 p-5 rounded-xl shadow-xl min-h-[538px] flex flex-col">
+                    <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-1">Detalhamento do Cliente</h3>
+                    <p class="text-xs text-slate-500 mb-4">Selecione uma linha para carregar</p>
+                    <div id="churnDetailEmpty" class="flex-grow flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-600 gap-3 py-16">
+                        <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <p class="text-xs font-medium px-4">Selecione um cliente na tabela para ver o detalhamento do risco de churn.</p>
+                    </div>
+                    <div id="churnDetailBody" class="hidden space-y-3 flex-grow"></div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script>
@@ -349,120 +456,232 @@ DASHBOARD_HTML = """
             }
         }
 
-        function switchTab(tabId) {
-            const contentComercial = document.getElementById('tab-content-comercial');
-            const contentNovoModulo = document.getElementById('tab-content-novo-modulo');
-            const btnComercial = document.getElementById('btn-comercial');
-            const btnNovoModulo = document.getElementById('btn-novo-modulo');
+        function loadLeadScript(row) {
+            const id = row.dataset.id;
+            const segmento = row.dataset.segmento;
+            const cat = row.dataset.cat;
+            const sug = row.dataset.sug;
+            const servico = row.dataset.servico;
+            const scriptEl = row.querySelector('.hidden-script-source');
+            const script = scriptEl ? scriptEl.textContent.trim() : '';
 
-            if (tabId === 'comercial') {
-                contentComercial.classList.remove('hidden');
-                contentNovoModulo.classList.add('hidden');
-                btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
-                btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200";
-            } else if (tabId === 'novo-modulo') {
-                contentComercial.classList.add('hidden');
-                contentNovoModulo.classList.remove('hidden');
-                btnNovoModulo.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
-                btnComercial.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200";
-                calculateCounters();
-            }
+            document.getElementById('scriptPlaceholder').classList.add('hidden');
+            document.getElementById('scriptContentBox').classList.remove('hidden');
+            document.getElementById('viewId').textContent = 'Lead #' + id;
+            document.getElementById('viewSegm').textContent = segmento;
+            document.getElementById('viewServico').textContent = servico;
+            document.getElementById('viewCat').textContent = cat;
+            document.getElementById('viewSug').textContent = sug;
+            document.getElementById('scriptBodyText').value = script;
+        }
+
+        function copyToClipboard() {
+            const text = document.getElementById('scriptBodyText').value;
+            navigator.clipboard.writeText(text).then(() => {
+                const alert = document.getElementById('copyAlert');
+                alert.classList.remove('hidden');
+                setTimeout(() => alert.classList.add('hidden'), 2500);
+            });
         }
 
         function filterTable() {
-            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
-            const filterVal = document.getElementById('priorityFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const priority = document.getElementById('priorityFilter').value;
             const rows = document.querySelectorAll('#leadsTable tbody tr');
-            
             rows.forEach(row => {
-                const id = row.getAttribute('data-id').toLowerCase();
-                const segmento = row.getAttribute('data-segmento').toLowerCase();
-                const priority = row.getAttribute('data-priority');
-                
-                const matchesSearch = id.includes(searchVal) || segmento.includes(searchVal);
-                const matchesPriority = (filterVal === 'TODOS' || priority === filterVal);
-                
-                if (matchesSearch && matchesPriority) { row.style.display = ''; } 
-                else { row.style.display = 'none'; }
+                const id = (row.dataset.id || '').toLowerCase();
+                const seg = (row.dataset.segmento || '').toLowerCase();
+                const prio = (row.dataset.priority || '');
+                const matchSearch = !search || id.includes(search) || seg.includes(search);
+                const matchPrio = priority === 'TODOS' || !priority || prio === priority;
+                row.style.display = matchSearch && matchPrio ? '' : 'none';
             });
         }
 
         function filterKanbanAFazer() {
-            const searchVal = document.getElementById('kanbanSearchInput').value.toLowerCase().trim();
-            const cards = document.querySelectorAll('#col-afazer > div');
-            
-            cards.forEach(card => {
-                const id = card.getAttribute('data-id').toLowerCase();
-                const innerText = card.textContent.toLowerCase();
-                
-                if (id.includes(searchVal) || innerText.includes(searchVal)) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
-                }
+            const search = document.getElementById('kanbanSearchInput').value.toLowerCase();
+            document.querySelectorAll('#col-afazer > div').forEach(card => {
+                const id = (card.dataset.id || '').toLowerCase();
+                card.style.display = !search || id.includes(search) ? '' : 'none';
             });
         }
 
-        function loadLeadScript(row) {
-            document.querySelectorAll('#leadsTable tbody tr').forEach(r => r.classList.remove('bg-blue-50', 'dark:bg-blue-600/10', 'border-l-2', 'border-blue-500'));
-            row.classList.add('bg-blue-50', 'dark:bg-blue-600/10', 'border-l-2', 'border-blue-500');
+        function switchTab(tabId) {
+            const tabs = ['comercial', 'novo-modulo', 'churn'];
+            const inactiveClass = "px-4 py-1.5 rounded-lg text-xs font-semibold transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200";
+            const activeClass = "px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow-sm";
 
-            const id = row.getAttribute('data-id');
-            const segmento = row.getAttribute('data-segmento');
-            const cat = row.getAttribute('data-cat');
-            const sug = row.getAttribute('data-sug');
-            const servico = row.getAttribute('data-servico');
-            const rawScript = row.querySelector('.hidden-script-source').textContent;
+            tabs.forEach(t => {
+                document.getElementById('tab-content-' + t).classList.add('hidden');
+                document.getElementById('btn-' + t).className = inactiveClass;
+            });
 
-            document.getElementById('scriptPlaceholder').classList.add('hidden');
-            document.getElementById('scriptContentBox').classList.remove('hidden');
-            document.getElementById('copyAlert').classList.add('hidden');
+            document.getElementById('tab-content-' + tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).className = activeClass;
 
-            document.getElementById('viewId').textContent = "Lead #" + id;
-            document.getElementById('viewSegm').textContent = segmento;
-            document.getElementById('viewCat').textContent = cat;
-            document.getElementById('viewSug').textContent = sug;
-            document.getElementById('viewServico').textContent = servico;
-            document.getElementById('scriptBodyText').value = rawScript;
+            if (tabId === 'novo-modulo') calculateCounters();
+            if (tabId === 'churn' && !churnLoaded) initChurn();
         }
 
-        function copyToClipboard() {
-            const copyText = document.getElementById("scriptBodyText");
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value);
-            
-            const alertBox = document.getElementById('copyAlert');
-            alertBox.classList.remove('hidden');
-            setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
+        // ── CHURN MODULE ──────────────────────────────────────────────────────
+        let churnData = [], churnFiltered = [], churnPage = 1, churnLoaded = false;
+        const CHURN_PAGE_SIZE = 15;
+
+        function seededRand(seed) {
+            let s = seed;
+            return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const zones = document.querySelectorAll('.kanban-zone');
-            zones.forEach(zone => {
-                new Sortable(zone, {
-                    group: 'kanban-crm',
-                    animation: 150,
-                    ghostClass: 'bg-slate-200',
-                    darkGhostClass: 'dark:bg-slate-800/50',
-                    onEnd: function (evt) {
-                        const itemEl = evt.item;
-                        const clientCode = itemEl.getAttribute('data-id');
-                        const destination = evt.to.getAttribute('data-status');
-                        
-                        fetch('/api/kanban/save', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ codcli: clientCode, nova_coluna: destination })
-                        })
-                        .then(res => res.json())
-                        .then(() => { calculateCounters(); })
-                        .catch(err => console.error("Falha ao salvar:", err));
+        function initChurn() {
+            churnLoaded = true;
+            const data = JSON.parse(document.getElementById('churn-json-data').textContent);
+            if (!data || !data.segmentos) return;
+
+            churnData = data.segmentos;
+            churnFiltered = [...churnData];
+
+            document.getElementById('churn-kpi-alto').textContent = data.segmentos.filter(function(s){ return s.taxa_churn >= 60; }).length;
+            document.getElementById('churn-kpi-medio').textContent = data.segmentos.filter(function(s){ return s.taxa_churn >= 35 && s.taxa_churn < 60; }).length;
+            document.getElementById('churn-kpi-baixo').textContent = data.segmentos.filter(function(s){ return s.taxa_churn < 35; }).length;
+            document.getElementById('churn-kpi-avg').textContent = data.taxa_global.toFixed(1) + '%';
+
+            renderChurnTable();
+
+            // Espera o Plotly carregar antes de renderizar os gráficos
+            if (typeof Plotly !== 'undefined') {
+                renderChurnCharts(data);
+            } else {
+                const interval = setInterval(function() {
+                    if (typeof Plotly !== 'undefined') {
+                        clearInterval(interval);
+                        renderChurnCharts(data);
                     }
-                });
+                }, 100);
+            }
+        }
+
+        function updateChurnKPIs() { /* substituido por initChurn */ }
+
+
+        function renderChurnCharts(data) {
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? '#1e293b' : '#e2e8f0';
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            // Gráfico de barras: top 10 segmentos por taxa de churn (% nível C)
+            const top10 = [...data.segmentos].sort((a,b) => b.taxa_churn - a.taxa_churn).slice(0, 10).reverse();
+            const barColors = top10.map(s => s.taxa_churn >= 60 ? '#f43f5e' : s.taxa_churn >= 35 ? '#f59e0b' : '#10b981');
+
+            Plotly.newPlot('churn-chart-seg', [{
+                type: 'bar', orientation: 'h',
+                x: top10.map(s => s.taxa_churn),
+                y: top10.map(s => s.segmento.length > 22 ? s.segmento.slice(0, 22) + '…' : s.segmento),
+                text: top10.map(s => s.taxa_churn + '%'),
+                textposition: 'outside',
+                marker: { color: barColors, line: { width: 0 } }
+            }], {
+                plot_bgcolor: 'rgba(0,0,0,0)', paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: textColor, family: 'Inter', size: 11 },
+                margin: { l: 145, r: 50, t: 10, b: 30 },
+                xaxis: { showgrid: true, gridcolor: gridColor, title: '% clientes nível C', range: [0, 115] },
+                yaxis: { showgrid: false, title: '' }
+            }, { displayModeBar: false, responsive: true });
+
+            // Donut: distribuição A/B/C
+            Plotly.newPlot('churn-chart-donut', [{
+                type: 'pie', hole: 0.65,
+                labels: ['Nível A (saudável)', 'Nível B (atenção)', 'Nível C (risco)'],
+                values: [data.nivel_a, data.nivel_b, data.nivel_c],
+                marker: { colors: ['#10b981', '#f59e0b', '#f43f5e'], line: { color: isDark ? '#0f172a' : '#f8fafc', width: 2 } },
+                textinfo: 'none'
+            }], {
+                plot_bgcolor: 'rgba(0,0,0,0)', paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: textColor, family: 'Inter', size: 11 },
+                margin: { l: 10, r: 10, t: 10, b: 10 },
+                showlegend: true,
+                legend: { orientation: 'h', yanchor: 'bottom', y: -0.2, xanchor: 'center', x: 0.5 }
+            }, { displayModeBar: false, responsive: true });
+        }
+
+        function filterChurnTable() {
+            const search = document.getElementById('churnSearch').value.toLowerCase();
+            const risco = document.getElementById('churnFilterRisco').value;
+            churnFiltered = churnData.filter(s => {
+                const ms = !search || s.segmento.toLowerCase().includes(search);
+                const mr = !risco || s.classificacao === risco;
+                return ms && mr;
             });
-            calculateCounters();
-        });
+            churnPage = 1;
+            renderChurnTable();
+        }
+
+        function renderChurnTable() {
+            const start = (churnPage - 1) * CHURN_PAGE_SIZE;
+            const page = churnFiltered.slice(start, start + CHURN_PAGE_SIZE);
+            const total = churnFiltered.length;
+            const totalPages = Math.ceil(total / CHURN_PAGE_SIZE);
+            const tbody = document.getElementById('churnTableBody');
+
+            if (page.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-400">Nenhum segmento encontrado.</td></tr>';
+            } else {
+                tbody.innerHTML = page.map(s => {
+                    const barColor = s.taxa_churn >= 60 ? '#f43f5e' : s.taxa_churn >= 35 ? '#f59e0b' : '#10b981';
+                    const badgeCl = s.taxa_churn >= 60
+                        ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-500 border-rose-200 dark:border-rose-500/20'
+                        : s.taxa_churn >= 35
+                        ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/20'
+                        : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-500/20';
+                    const label = s.taxa_churn >= 60 ? 'ALTO' : s.taxa_churn >= 35 ? 'MÉDIO' : 'BAIXO';
+                    const tr = '<tr onclick="selectChurnSegmento(' + JSON.stringify(s.segmento) + ')" class="hover:bg-slate-100 dark:hover:bg-slate-900/40 cursor-pointer border-b border-slate-200 dark:border-slate-900/60 transition duration-150">' +
+                        '<td class="px-5 py-3 font-semibold text-slate-800 dark:text-white">' + s.segmento + '</td>' +
+                        '<td class="px-5 py-3 text-slate-500 font-mono text-xs">' + s.total + '</td>' +
+                        '<td class="px-5 py-3 text-rose-500 font-semibold">' + s.nivel_c + '</td>' +
+                        '<td class="px-5 py-3"><div class="flex items-center gap-2"><div class="flex-1 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden"><div style="width:' + s.taxa_churn + '%;background:' + barColor + '" class="h-full rounded-full"></div></div><span class="text-xs font-mono text-slate-600 dark:text-slate-400 w-10 text-right">' + s.taxa_churn + '%</span></div></td>' +
+                        '<td class="px-5 py-3"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ' + badgeCl + '">' + label + '</span></td>' +
+                        '</tr>';
+                    return tr;
+                }).join('');
+            }
+            document.getElementById('churnPageInfo').textContent = (start + 1) + '\u2013' + Math.min(start + CHURN_PAGE_SIZE, total) + ' de ' + total;
+            document.getElementById('churnBtnPrev').disabled = churnPage === 1;
+            document.getElementById('churnBtnNext').disabled = churnPage >= totalPages;
+        }
+
+        function churnChangePage(dir) { churnPage += dir; renderChurnTable(); }
+
+        function selectChurnSegmento(segmento) {
+            const s = churnData.find(x => x.segmento === segmento);
+            if (!s) return;
+            const scoreColor = s.taxa_churn >= 60 ? '#f43f5e' : s.taxa_churn >= 35 ? '#f59e0b' : '#10b981';
+            const label = s.taxa_churn >= 60 ? 'ALTO' : s.taxa_churn >= 35 ? 'MÉDIO' : 'BAIXO';
+            const badgeCl = s.taxa_churn >= 60 ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-500 border-rose-200' : s.taxa_churn >= 35 ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border-emerald-200';
+            const acao = s.taxa_churn >= 60 ? 'Segmento crítico. Mais de 60% dos clientes em nível C. Ação imediata de retenção recomendada.' : s.taxa_churn >= 35 ? 'Atenção moderada. Monitore e acione clientes nível C com proposta de upsell.' : 'Segmento saudável. Foco em expansão de portfólio.';
+            document.getElementById('churnDetailEmpty').classList.add('hidden');
+            const body = document.getElementById('churnDetailBody');
+            body.classList.remove('hidden');
+            body.innerHTML =
+                '<div class="space-y-2 text-xs">' +
+                    '<div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800"><span class="text-slate-500">Segmento</span><span class="font-bold text-yellow-600 dark:text-yellow-500">' + s.segmento + '</span></div>' +
+                    '<div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800"><span class="text-slate-500">Total de clientes</span><span class="font-bold font-mono">' + s.total + '</span></div>' +
+                    '<div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800"><span class="text-slate-500">N\u00edvel A (saud\u00e1vel)</span><span class="font-bold text-emerald-600">' + s.nivel_a + '</span></div>' +
+                    '<div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800"><span class="text-slate-500">N\u00edvel B (aten\u00e7\u00e3o)</span><span class="font-bold text-amber-600">' + s.nivel_b + '</span></div>' +
+                    '<div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800"><span class="text-slate-500">N\u00edvel C (risco)</span><span class="font-bold text-rose-500">' + s.nivel_c + '</span></div>' +
+                '</div>' +
+                '<div class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl p-4 mt-3">' +
+                    '<p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Taxa de Churn (% n\u00edvel C)</p>' +
+                    '<div class="h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mb-2"><div style="width:' + s.taxa_churn + '%;background:' + scoreColor + '" class="h-full rounded-full transition-all duration-500"></div></div>' +
+                    '<div class="flex justify-between items-center">' +
+                        '<span class="text-2xl font-bold font-mono" style="color:' + scoreColor + '">' + s.taxa_churn + '<span class=\"text-xs text-slate-400 font-sans\">%</span></span>' +
+                        '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ' + badgeCl + '">' + label + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="mt-3 p-3 bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 rounded-xl text-xs text-slate-600 dark:text-slate-400 leading-relaxed">' +
+                    '&#x1F4A1; <strong class=\"text-slate-800 dark:text-slate-200\">A\u00e7\u00e3o Recomendada:</strong> ' + acao +
+                '</div>';
+        }
+
+
 
         function calculateCounters() {
             document.getElementById('count-afazer').textContent = document.querySelectorAll('#col-afazer > div').length;
@@ -470,7 +689,30 @@ DASHBOARD_HTML = """
             document.getElementById('count-recusado').textContent = document.querySelectorAll('#col-recusado > div').length;
             document.getElementById('count-aceito').textContent = document.querySelectorAll('#col-aceito > div').length;
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const zones = document.querySelectorAll('.kanban-zone');
+            zones.forEach(zone => {
+                Sortable.create(zone, {
+                    group: 'kanban',
+                    animation: 150,
+                    ghostClass: 'opacity-30',
+                    onEnd: function(evt) {
+                        const cardId = evt.item.dataset.id;
+                        const novaColuna = evt.to.dataset.status;
+                        fetch('/api/kanban/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ codcli: cardId, nova_coluna: novaColuna })
+                        }).then(() => { calculateCounters(); });
+                        calculateCounters();
+                    }
+                });
+            });
+            calculateCounters();
+        });
     </script>
+    <script id="churn-json-data" type="application/json">{{CHURN_DATA}}</script>
 </body>
 </html>
 """
@@ -556,6 +798,8 @@ def login(username: str = Form(...), password: str = Form(...)):
         script_texto = str(row.get('script_abordagem', '')).strip()
         if script_texto in ["", "nan", "None", "Script não gerado."]:
             script_texto = f"Olá, identificamos chamados sobre {categoria} e sugerimos a solução {solucao}."
+        # Sanitiza caracteres que quebram o HTML
+        script_texto = script_texto.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
         cor_prio = "text-rose-500" if prioridade == "ALTA" else ("text-blue-500 dark:text-blue-400" if prioridade == "MÉDIA" else "text-slate-500 dark:text-slate-400")
         
@@ -598,6 +842,75 @@ def login(username: str = Form(...), password: str = Form(...)):
         .replace("{{KANBAN_AGUARDANDO}}", kanban_buffers["aguardando"])\
         .replace("{{KANBAN_RECUSADO}}", kanban_buffers["recusado"])\
         .replace("{{KANBAN_ACEITO}}", kanban_buffers["aceito"])
+
+    # --- CHURN DATA (baseado no schurn.xlsx, lógica do notebook de análise) ---
+    import json as _json
+    churn_json_str = "{}"
+    caminhos_schurn = [
+        os.path.join("data", "raw", "schurn (1).xlsx"),
+        os.path.join("data", "raw", "schurn.xlsx"),
+        os.path.join("output", "schurn.xlsx"),
+        "schurn.xlsx",
+    ]
+    df_schurn = None
+    for _p in caminhos_schurn:
+        if os.path.exists(_p):
+            df_schurn = pd.read_excel(_p)
+            break
+
+    if df_schurn is not None and not df_schurn.empty:
+        try:
+            total_seg = df_schurn.groupby("segmento").size()
+            clientes_c = df_schurn[df_schurn["nivel_cliente"] == "C"].groupby("segmento").size()
+            analise = pd.DataFrame({"total": total_seg, "nivel_c": clientes_c}).fillna(0).astype(int)
+            analise["taxa_churn"] = (analise["nivel_c"] / analise["total"] * 100).round(1)
+
+            def classifica(t):
+                return "ALTO" if t >= 60 else ("MEDIO" if t >= 35 else "BAIXO")
+
+            total_srv = df_schurn.groupby("servico").size()
+            c_srv = df_schurn[df_schurn["nivel_cliente"] == "C"].groupby("servico").size()
+            analise_srv = pd.DataFrame({"total": total_srv, "nivel_c": c_srv}).fillna(0).astype(int)
+            analise_srv["taxa_churn"] = (analise_srv["nivel_c"] / analise_srv["total"] * 100).round(1)
+
+            churn_list = []
+            for seg, row in analise.iterrows():
+                churn_list.append({
+                    "segmento": seg,
+                    "total": int(row["total"]),
+                    "nivel_c": int(row["nivel_c"]),
+                    "nivel_a": int(df_schurn[(df_schurn["segmento"] == seg) & (df_schurn["nivel_cliente"] == "A")].shape[0]),
+                    "nivel_b": int(df_schurn[(df_schurn["segmento"] == seg) & (df_schurn["nivel_cliente"] == "B")].shape[0]),
+                    "taxa_churn": float(row["taxa_churn"]),
+                    "classificacao": classifica(float(row["taxa_churn"])),
+                })
+            churn_list.sort(key=lambda x: -x["taxa_churn"])
+
+            srv_list = []
+            for srv, row in analise_srv.sort_values("taxa_churn", ascending=False).head(15).iterrows():
+                srv_list.append({
+                    "servico": srv,
+                    "total": int(row["total"]),
+                    "nivel_c": int(row["nivel_c"]),
+                    "taxa_churn": float(row["taxa_churn"]),
+                })
+
+            churn_json_str = _json.dumps({
+                "segmentos": churn_list,
+                "servicos": srv_list,
+                "taxa_global": round(float((df_schurn["nivel_cliente"] == "C").mean() * 100), 1),
+                "total_clientes": int(len(df_schurn)),
+                "nivel_a": int((df_schurn["nivel_cliente"] == "A").sum()),
+                "nivel_b": int((df_schurn["nivel_cliente"] == "B").sum()),
+                "nivel_c": int((df_schurn["nivel_cliente"] == "C").sum()),
+            }, ensure_ascii=True)
+        except Exception as e:
+            churn_json_str = "{}"
+
+    html_customizado = html_customizado.replace("{{CHURN_DATA}}", churn_json_str)
+
+    # Limpa surrogates e caracteres inválidos
+    html_customizado = html_customizado.encode('utf-8', errors='replace').decode('utf-8')
 
     return HTMLResponse(content=html_customizado)
 
