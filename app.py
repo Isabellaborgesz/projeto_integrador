@@ -225,8 +225,14 @@ DASHBOARD_HTML = """
                                 <option value="B">Nivel B</option>
                                 <option value="C">Nivel C</option>
                             </select>
-                            <select id="rec-seg" onchange="recFiltrar()" class="flex-1 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 focus:outline-none focus:border-blue-500">
+                            <select id="rec-seg" onchange="recFiltrar()" class="w-full mr-2 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 focus:outline-none focus:border-blue-500">
                                 <option value="">Todos segmentos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="rec-consultor" onchange="recFiltrar()" class="w-full border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 focus:outline-none focus:border-blue-500">
+                                <option value="">Todos os consultores</option>
+                                {{CONSULTOR_OPTIONS}}
                             </select>
                         </div>
                     </div>
@@ -365,8 +371,8 @@ DASHBOARD_HTML = """
         <main id="tab-content-churn" class="hidden flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
             <div class="border-b border-slate-200 dark:border-slate-900 pb-6 mb-6">
-                <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">Analise de Risco de Churn</h1>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Score calculado por nivel do cliente, portfolio de servicos e oportunidades nao aproveitadas.</p>
+                <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">Análise de Risco de Churn</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Score calculado por nível do cliente, portfólio de serviços e oportunidades não aproveitadas.</p>
             </div>
 
             <!-- LINHA 1: TOP 5 CARDS (HORIZONTAL) -->
@@ -459,10 +465,33 @@ DASHBOARD_HTML = """
                 .catch(function(e){ console.error('Erro ao carregar recomendacoes:', e); });
         }
 
+        var recConsultorAtivo = '';
         function recFiltrar() {
             var q = (document.getElementById('rec-search').value||'').toLowerCase();
             var nivel = document.getElementById('rec-nivel').value;
             var seg = document.getElementById('rec-seg').value;
+            var consultor = document.getElementById('rec-consultor').value;
+
+            // Se o consultor mudou, recarrega dados da API com o novo consultor
+            if (consultor !== recConsultorAtivo) {
+                recConsultorAtivo = consultor;
+                var url = consultor ? '/api/recomendacoes?consultor=' + encodeURIComponent(consultor) : '/api/recomendacoes';
+                fetch(url)
+                    .then(function(r){ return r.json(); })
+                    .then(function(dados){
+                        recTodos = dados;
+                        recFiltrados = dados.filter(function(r){
+                            var mq = !q || String(r.codcli).includes(q) || r.servico_recomendado.toLowerCase().includes(q) || r.segmento.toLowerCase().includes(q);
+                            var mn = !nivel || r.nivel_cliente === nivel;
+                            var ms = !seg || r.segmento === seg;
+                            return mq && mn && ms;
+                        });
+                        recPagAtual = 1;
+                        recRenderLista();
+                    });
+                return;
+            }
+
             recFiltrados = recTodos.filter(function(r){
                 var mq = !q || String(r.codcli).includes(q) || r.servico_recomendado.toLowerCase().includes(q) || r.segmento.toLowerCase().includes(q);
                 var mn = !nivel || r.nivel_cliente === nivel;
@@ -500,7 +529,7 @@ DASHBOARD_HTML = """
                 // CORREÇÃO: usar uma função separada em vez de inline onclick
                 var id = r.codcli;
                 
-                return '<div data-codcli="' + id + '" class="rec-item px-4 py-3 cursor-pointer transition ' + activeCls + '">'
+                return '<div data-codcli="' + id + '" data-servico="' + r.servico_recomendado + '" class="rec-item px-4 py-3 cursor-pointer transition ' + activeCls + '">'
                     + '<div class="flex justify-between items-center">'
                     + '<span class="text-sm font-bold text-slate-800 dark:text-white">Cliente #' + r.codcli + '</span>'
                     + '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ' + nc + '">Nivel ' + r.nivel_cliente + '</span>'
@@ -513,7 +542,9 @@ DASHBOARD_HTML = """
             document.querySelectorAll('.rec-item').forEach(function(item) {
                 item.addEventListener('click', function() {
                     var codcli = parseInt(this.dataset.codcli);
-                    var cliente = recTodos.find(function(r) { return r.codcli === codcli; });
+                    var servico = this.dataset.servico;
+                    var cliente = recTodos.find(function(r) { return r.codcli === codcli && r.servico_recomendado === servico; });
+                    if (!cliente) cliente = recTodos.find(function(r) { return r.codcli === codcli; });
                     if (cliente) recSelecionar(cliente);
                 });
             });
@@ -557,6 +588,11 @@ DASHBOARD_HTML = """
             var justs = r.justificativas || [];
             var lista = todas ? justs : justs.slice(0, 3);
             var total = justs.length;
+            // DEBUG: inspecionar os dados que chegam
+            if (lista.length > 0) {
+                console.log('[DEBUG] justificativa[0]:', JSON.stringify(lista[0]));
+                console.log('[DEBUG] percentual_base:', lista[0].percentual_base, typeof lista[0].percentual_base);
+            }
             document.getElementById('rec-just-btn').textContent = todas ? 'Ver menos' : 'Ver todas';
             document.getElementById('rec-just-titulo').textContent = todas
                 ? 'Justificativas (todas as ' + total + ')'
@@ -565,6 +601,8 @@ DASHBOARD_HTML = """
                 var origens = j.tipo_regra === 'dupla'
                     ? '<strong>' + (j.origem||'') + '</strong>'
                     : '<strong>' + (j.origem_1||'') + '</strong> e <strong>' + (j.origem_2||'') + '</strong>';
+                var pb = parseFloat(j.percentual_base);
+                var pbTexto = (!isNaN(pb) && pb > 0) ? pb.toFixed(2) + '%' : 'N/A';
                 return '<div class="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl">'
                     + '<p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">'
                     + j.percentual_relacao.toFixed(1) + '% dos clientes que possuem ' + origens
@@ -573,7 +611,7 @@ DASHBOARD_HTML = """
                     + '<div class="flex gap-2 mt-2 flex-wrap">'
                     + '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">&#x1F4C8; Lift: ' + j.lift.toFixed(2) + '</span>'
                     + '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-100 dark:border-violet-500/20">&#x1F517; Relacao: ' + j.percentual_relacao.toFixed(2) + '%</span>'
-                    + '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20">&#x1F4CA; Media da carteira: ' + (j.percentual_base||0).toFixed(2) + '%</span>'
+                    + '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20">&#x1F4CA; Media da carteira: ' + pbTexto + '</span>'
                     + '</div></div>';
             }).join('');
         }
@@ -1121,7 +1159,7 @@ def login(username: str = Form(...), password: str = Form(...)):
             
             servicos_por_segmento = {}
             servico_rec_por_segmento = {}
-            if 'servico' in df_clientes.columns:
+            if 'servico' in df_clientes.columns:    
                 df_srvs = df_clientes.dropna(subset=['segmento'])
                 for seg in df_srvs['segmento'].unique():
                     servicos = df_srvs[df_srvs['segmento'] == seg]['servico'].dropna().value_counts().head(8).index.tolist()
@@ -1166,6 +1204,32 @@ def login(username: str = Form(...), password: str = Form(...)):
         except Exception as e:
             print(f"Erro churn: {e}")
     
+    # Gerar options de consultor a partir do JSON
+    consultor_options = ''
+    for _p in [
+        'recomendacoes.json',
+        os.path.join('output', 'recomendacoes.json'),
+        os.path.join('data', 'raw', 'recomendacoes.json'),
+    ]:
+        if os.path.exists(_p):
+            print(f'[CONSULTOR] Usando arquivo: {_p}')
+            try:
+                with open(_p, 'r', encoding='utf-8', errors='replace') as _f:
+                    _rec = _json.load(_f)
+                _recs = _rec.get('recomendacoes', _rec) if isinstance(_rec, dict) else _rec
+                _consultores = sorted(set(
+                    (r.get('consultor') or '').strip()
+                    for r in _recs
+                    if r.get('consultor')
+                ), key=lambda x: x.lower())
+                consultor_options = ''.join(
+                    f'<option value="{c}">{c}</option>' for c in _consultores
+                )
+                print(f'[CONSULTOR] {len(_consultores)} consultores gerados: {_consultores}')
+            except Exception as e:
+                print(f'Erro ao gerar consultor_options: {e}')
+            break
+
     html = DASHBOARD_HTML.replace("{{CHURN_DATA}}", churn_json_str)
     html = html.replace("{{KPI_TOTAL}}", kpi_total).replace("{{KPI_ALTA}}", kpi_alta)
     html = html.replace("{{KPI_TICKETS}}", kpi_tickets).replace("{{KPI_TOP}}", kpi_top)
@@ -1175,22 +1239,31 @@ def login(username: str = Form(...), password: str = Form(...)):
     html = html.replace("{{KANBAN_AGUARDANDO}}", kanban_buffers["aguardando"])
     html = html.replace("{{KANBAN_RECUSADO}}", kanban_buffers["recusado"])
     html = html.replace("{{KANBAN_ACEITO}}", kanban_buffers["aceito"])
+    html = html.replace("{{CONSULTOR_OPTIONS}}", consultor_options)
     
     return HTMLResponse(content=html)
 
 @app.get("/api/recomendacoes")
-def get_recomendacoes():
+def get_recomendacoes(consultor: str = ""):
     for _p in [
+        "recomendacoes.json",
         os.path.join("output", "recomendacoes.json"),
         os.path.join("data", "raw", "recomendacoes.json"),
-        "recomendacoes.json",
     ]:
         if os.path.exists(_p):
             try:
                 with open(_p, "r", encoding="utf-8", errors="replace") as _f:
                     _rec = _json.load(_f)
                 _recs = _rec.get("recomendacoes", _rec) if isinstance(_rec, dict) else _rec
-                _recs = [r for r in _recs if r.get("score", 0) > 800]
+                
+                if consultor:
+                    # Filtrar pelo consultor específico, sem restrição de score
+                    _recs = [r for r in _recs if (r.get("consultor") or "").strip() == consultor.strip()]
+                else:
+                    # Sem consultor selecionado: ordena do maior para o menor score e pega os top 1000
+                    _recs.sort(key=lambda x: x.get("score", 0), reverse=True)
+                    _recs = _recs[:1000]
+                    
                 return JSONResponse(content=_recs)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
