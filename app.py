@@ -383,22 +383,11 @@ DASHBOARD_HTML = """
                 </div>
             </div>
 
-            <!-- LINHA 2: GRAFICO BARRAS (ESQUERDA) + GRAFICO ROSCA (DIREITA) -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                
-                <!-- Grafico de Barras Horizontal -->
-                <div class="bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                    <h3 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">Score Medio por Segmento</h3>
-                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mb-3">Top 10 segmentos com maior risco medio</p>
-                    <div id="churn-bar-chart" style="height: 360px;"></div>
-                </div>
-
-                <!-- Grafico de Rosca -->
-                <div class="bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                    <h3 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">Top Oportunidades por Servico</h3>
-                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mb-3">Servicos mais recomendados na base de clientes</p>
-                    <div id="churn-donut-chart" style="height: 280px;"></div>
-                </div>
+            <!-- LINHA 2: GRAFICO STACKED BAR GRANDE -->
+            <div class="bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-xl p-4 mb-8">
+                <h3 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">Portfolio de Servicos por Segmento</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mb-3">Top 10 servicos × 5 segmentos com maior volume de servicos contratados</p>
+                <div id="churn-stacked-chart" style="height: 440px;"></div>
             </div>
 
         </main>
@@ -413,8 +402,7 @@ DASHBOARD_HTML = """
                 localStorage.theme = 'light';
             }
             if (churnLoaded) {
-                renderBarChart();
-                renderDonutChart();
+                renderStackedBarChart();
             }
         }
 
@@ -601,7 +589,13 @@ DASHBOARD_HTML = """
                 var origens = j.tipo_regra === 'dupla'
                     ? '<strong>' + (j.origem||'') + '</strong>'
                     : '<strong>' + (j.origem_1||'') + '</strong> e <strong>' + (j.origem_2||'') + '</strong>';
-                var pb = parseFloat(j.percentual_base);
+                var pb = (j.percentual_base != null) ? parseFloat(j.percentual_base) : NaN;
+                if (isNaN(pb) || pb <= 0) {
+                    // Calcular media da carteira: percentual_relacao / lift
+                    var lift = parseFloat(j.lift);
+                    var rel = parseFloat(j.percentual_relacao);
+                    pb = (lift > 0 && !isNaN(rel)) ? rel / lift : NaN;
+                }
                 var pbTexto = (!isNaN(pb) && pb > 0) ? pb.toFixed(2) + '%' : 'N/A';
                 return '<div class="p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl">'
                     + '<p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">'
@@ -661,6 +655,7 @@ DASHBOARD_HTML = """
         let churnLoaded = false;
         let churnSegmentos = [];
         let churnServicosPorSegmento = {};
+        let churnServicosContagemPorSegmento = {};
         let churnServicoRecPorSegmento = {};
         let churnDataGlobal = null;
 
@@ -675,12 +670,12 @@ DASHBOARD_HTML = """
                 if (data && data.segmentos) {
                     churnSegmentos = data.segmentos;
                     churnServicosPorSegmento = data.servicos_por_segmento || {};
+                    churnServicosContagemPorSegmento = data.servicos_contagem_por_segmento || {};
                     churnServicoRecPorSegmento = data.servico_rec_por_segmento || {};
                     churnDataGlobal = data;
                     
                     renderTop5Cards();
-                    renderBarChart();
-                    renderDonutChart();
+                    renderStackedBarChart();
                 } else {
                     showChurnFallback();
                 }
@@ -775,87 +770,86 @@ DASHBOARD_HTML = """
             }).join('');
         }
 
-        function renderBarChart() {
-            // Inverter: maior risco em cima no gráfico horizontal (Plotly inverte eixo Y)
-            const top10 = [...churnSegmentos].sort((a,b) => a.taxa_churn - b.taxa_churn).slice(-10);
+        function renderStackedBarChart() {
             const isDark = document.documentElement.classList.contains('dark');
             const gridColor = isDark ? '#1e293b' : '#e2e8f0';
             const textColor = isDark ? '#94a3b8' : '#64748b';
-            
-            const barColors = top10.map(s => s.taxa_churn >= 60 ? '#ef4444' : (s.taxa_churn >= 35 ? '#f59e0b' : '#10b981'));
-            
-            const data = [{
-                type: 'bar',
-                orientation: 'h',
-                x: top10.map(s => s.taxa_churn),
-                y: top10.map(s => s.segmento.length > 28 ? s.segmento.substring(0,25) + '...' : s.segmento),
-                text: top10.map(s => s.taxa_churn + '%'),
-                textposition: 'outside',
-                marker: { color: barColors, line: { width: 0 } },
-                hovertemplate: '<b>%{y}</b><br>Taxa de Churn: %{x}%<br>Clientes Nivel C: %{customdata}<extra></extra>',
-                customdata: top10.map(s => s.nivel_c + ' de ' + s.total)
-            }];
-            
+
+            // --- 1. Top 5 segmentos com mais servicos (soma de contagens) ---
+            const contagemTotal = {};
+            Object.entries(churnServicosContagemPorSegmento).forEach(([seg, counts]) => {
+                contagemTotal[seg] = Object.values(counts).reduce((a, b) => a + b, 0);
+            });
+            const top5segs = Object.entries(contagemTotal)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(e => e[0]);
+
+            // --- 2. Top 10 servicos globais (soma entre os 5 segmentos) ---
+            const servicoGlobal = {};
+            top5segs.forEach(seg => {
+                const counts = churnServicosContagemPorSegmento[seg] || {};
+                Object.entries(counts).forEach(([srv, cnt]) => {
+                    servicoGlobal[srv] = (servicoGlobal[srv] || 0) + cnt;
+                });
+            });
+            const top10srvs = Object.entries(servicoGlobal)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10)
+                .map(e => e[0]);
+
+            // Invertido para que o maior fique no topo (Plotly inverte eixo Y em bar horizontal)
+            const yLabels = [...top10srvs].reverse();
+
+            // --- 3. Paleta de cores para os 5 segmentos ---
+            const cores = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+
+            // --- 4. Montar traces (uma por segmento) ---
+            const traces = top5segs.map((seg, idx) => {
+                const counts = churnServicosContagemPorSegmento[seg] || {};
+                const xVals = yLabels.map(srv => counts[srv] || 0);
+                const segLabel = seg.length > 22 ? seg.substring(0, 20) + '..' : seg;
+                return {
+                    type: 'bar',
+                    orientation: 'h',
+                    name: segLabel,
+                    x: xVals,
+                    y: yLabels,
+                    marker: { color: cores[idx], opacity: 0.88 },
+                    hovertemplate: '<b>%{y}</b><br>' + seg + ': %{x} clientes<extra></extra>'
+                };
+            });
+
             const layout = {
+                barmode: 'stack',
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 font: { color: textColor, family: 'Inter', size: 10 },
-                margin: { l: 145, r: 45, t: 10, b: 20 },
-                xaxis: { 
-                    showgrid: true, 
-                    gridcolor: gridColor, 
-                    title: { text: 'Clientes Nivel C (%)', font: { size: 9 } },
-                    range: [0, 105]
+                margin: { l: 180, r: 30, t: 10, b: 50 },
+                xaxis: {
+                    showgrid: true,
+                    gridcolor: gridColor,
+                    title: { text: 'Numero de Clientes', font: { size: 10 } },
+                    zeroline: false
                 },
-                yaxis: { showgrid: false, title: '' },
-                height: 340
-            };
-            
-            Plotly.newPlot('churn-bar-chart', data, layout, { displayModeBar: false, responsive: true });
-        }
-
-        function renderDonutChart() {
-            if (!churnDataGlobal || !churnServicoRecPorSegmento) return;
-            const isDark = document.documentElement.classList.contains('dark');
-
-            // Contar quantas vezes cada servico aparece como recomendado
-            const contagem = {};
-            Object.values(churnServicoRecPorSegmento).forEach(function(sv) {
-                contagem[sv] = (contagem[sv] || 0) + 1;
-            });
-
-            // Ordenar e pegar top 8
-            const sorted = Object.entries(contagem).sort((a,b) => b[1]-a[1]).slice(0, 8);
-            const labels = sorted.map(e => e[0].length > 30 ? e[0].substring(0,28)+'..' : e[0]);
-            const values = sorted.map(e => e[1]);
-
-            const cores = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#64748b'];
-
-            const plotData = [{
-                type: 'pie',
-                hole: 0.58,
-                labels: labels,
-                values: values,
-                marker: {
-                    colors: cores,
-                    line: { color: isDark ? '#0f172a' : '#f8fafc', width: 2 }
+                yaxis: {
+                    showgrid: false,
+                    automargin: true,
+                    tickfont: { size: 10 }
                 },
-                textinfo: 'percent',
-                textposition: 'inside',
-                insidetextorientation: 'radial',
-                hovertemplate: '<b>%{label}</b><br>Recomendado em %{value} segmento(s)<br>%{percent}<extra></extra>'
-            }];
-
-            const layout = {
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: isDark ? '#94a3b8' : '#64748b', family: 'Inter', size: 10 },
-                margin: { l: 10, r: 10, t: 10, b: 80 },
-                showlegend: true,
-                legend: { orientation: 'h', yanchor: 'top', y: -0.18, xanchor: 'center', x: 0.5, font: { size: 9 }, tracegroupgap: 6 }
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: -0.22,
+                    xanchor: 'center',
+                    x: 0.5,
+                    font: { size: 9 },
+                    bgcolor: 'rgba(0,0,0,0)'
+                },
+                height: 420
             };
 
-            Plotly.newPlot('churn-donut-chart', plotData, layout, { displayModeBar: false, responsive: true });
+            Plotly.newPlot('churn-stacked-chart', traces, layout, { displayModeBar: false, responsive: true });
         }
 
         function showChurnFallback() {
@@ -1158,12 +1152,15 @@ def login(username: str = Form(...), password: str = Form(...)):
             analise = analise[analise["total"] > 0]
             
             servicos_por_segmento = {}
+            servicos_contagem_por_segmento = {}
             servico_rec_por_segmento = {}
             if 'servico' in df_clientes.columns:    
                 df_srvs = df_clientes.dropna(subset=['segmento'])
                 for seg in df_srvs['segmento'].unique():
-                    servicos = df_srvs[df_srvs['segmento'] == seg]['servico'].dropna().value_counts().head(8).index.tolist()
+                    vc = df_srvs[df_srvs['segmento'] == seg]['servico'].dropna().value_counts()
+                    servicos = vc.head(8).index.tolist()
                     servicos_por_segmento[str(seg)] = servicos if servicos else ['Acesso Dedicado - Fisico']
+                    servicos_contagem_por_segmento[str(seg)] = {str(k): int(v) for k, v in vc.items()}
             # Top servico recomendado por segmento (via recomendacoes.json)
             for _p in [os.path.join("output","recomendacoes.json"), os.path.join("data","raw","recomendacoes.json"), "recomendacoes.json"]:
                 if os.path.exists(_p):
@@ -1194,6 +1191,7 @@ def login(username: str = Form(...), password: str = Form(...)):
             churn_json_str = _json.dumps({
                 "segmentos": churn_list,
                 "servicos_por_segmento": servicos_por_segmento,
+                "servicos_contagem_por_segmento": servicos_contagem_por_segmento,
                 "servico_rec_por_segmento": servico_rec_por_segmento,
                 "taxa_global": round(float(clientes_c.sum() / total_seg.sum() * 100), 1),
                 "total_clientes": int(total_seg.sum()),
